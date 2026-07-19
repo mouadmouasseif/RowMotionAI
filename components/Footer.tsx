@@ -15,7 +15,7 @@ export function Footer() {
         <div className="footer-credit"><span>Développé par</span><Image src="/made-for-web.png" alt="Mouad Mouasseif" width={42} height={42} /><strong>Mouad Mouasseif</strong></div>
       </div>
       <div className="footer-bottom">© 2026 RowMotion AI <span>|</span> Développé par Mouad Mouasseif. Tous droits réservés.</div>
-      <a className="footer-chat" href="mailto:contact@rowmotion.ai" aria-label="Contacter RowMotion AI"><MessageCircle /></a>
+      <a className="footer-chat" href="https://mouadmouasseif.vercel.app/" aria-label="Contacter RowMotion AI"><MessageCircle /></a>
     </footer>
   );
 }

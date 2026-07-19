@@ -1,6 +1,6 @@
 import { signInWithEmailAndPassword, signOut } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore/lite";
-import { auth, db } from "@/lib/firebase";
+import { auth, db, firebaseConfigurationError } from "@/lib/firebase";
 import { isUserRole, type UserProfile, type UserRole } from "@/types/user";
 
 interface LoginParams {
@@ -42,7 +42,11 @@ async function verifySuperAdminCode(code: string): Promise<void> {
 }
 
 export async function loginUser({ email, password, selectedRole, superAdminCode = "" }: LoginParams): Promise<UserProfile> {
-  if (!auth || !db) throw new Error("Firebase n’est pas correctement configuré.");
+  if (!auth || !db) {
+    throw new Error(process.env.NODE_ENV === "development" && firebaseConfigurationError
+      ? firebaseConfigurationError
+      : "Le service de connexion est temporairement indisponible.");
+  }
   if (selectedRole === "superadmin") await verifySuperAdminCode(superAdminCode);
 
   const credential = await signInWithEmailAndPassword(auth, email.trim(), password);
