@@ -1,0 +1,52 @@
+import { signInWithEmailAndPassword, signOut } from "firebase/auth";
+import { doc, getDoc } from "firebase/firestore";
+import { auth, db } from "@/lib/firebase";
+import { isUserRole, type UserProfile, type UserRole } from "@/types/user";
+
+interface LoginParams {
+  email: string;
+  password: string;
+  selectedRole: UserRole;
+  superAdminCode?: string;
+}
+
+export function createUserProfile(uid: string, authEmail: string | null, data: Record<string, unknown>): UserProfile {
+  if (!isUserRole(data.role)) throw new Error("Le profil possède un rôle invalide.");
+  return {
+    uid,
+    email: typeof data.email === "string" ? data.email : authEmail ?? "",
+    firstName: typeof data.firstName === "string" ? data.firstName : "",
+    lastName: typeof data.lastName === "string" ? data.lastName : "",
+    role: data.role,
+    active: data.active === true,
+    clubId: typeof data.clubId === "string" ? data.clubId : null,
+  };
+}
+
+async function verifySuperAdminCode(code: string): Promise<void> {
+  const response = await fetch("/api/auth/verify-super-admin", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ code }),
+  });
+  const result = (await response.json()) as { valid?: boolean };
+  if (!response.ok || result.valid !== true) throw new Error("Code Super administrateur incorrect.");
+}
+
+export async function loginUser({ email, password, selectedRole, superAdminCode = "" }: LoginParams): Promise<UserProfile> {
+  if (!auth || !db) throw new Error("Firebase n’est pas correctement configuré.");
+  if (selectedRole === "superadmin") await verifySuperAdminCode(superAdminCode);
+
+  const credential = await signInWithEmailAndPassword(auth, email.trim(), password);
+  try {
+    const snapshot = await getDoc(doc(db, "users", credential.user.uid));
+    if (!snapshot.exists()) throw new Error("Le compte existe, mais son profil n’est pas configuré.");
+    const profile = createUserProfile(credential.user.uid, credential.user.email, snapshot.data());
+    if (!profile.active) throw new Error("Ce compte a été désactivé.");
+    if (profile.role !== selectedRole) throw new Error("Le rôle sélectionné ne correspond pas à ce compte.");
+    return profile;
+  } catch (error) {
+    await signOut(auth);
+    throw error;
+  }
+}

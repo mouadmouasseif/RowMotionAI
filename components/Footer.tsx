@@ -1,0 +1,21 @@
+import { MessageCircle } from "lucide-react";
+import Link from "next/link";
+import Image from "next/image";
+import { Brand } from "./Brand";
+
+export function Footer() {
+  return (
+    <footer className="site-footer">
+      <div className="footer-top">
+        <div className="footer-identity"><Brand /><span className="footer-divider" /><strong>RowMotion AI</strong></div>
+        <nav className="footer-links" aria-label="Liens légaux">
+          <Link href="/politique-de-confidentialite">Politique de confidentialité</Link>
+          <Link href="/conditions-utilisation">Conditions d’utilisation</Link>
+        </nav>
+        <div className="footer-credit"><span>Développé par</span><Image src="/made-for-web.png" alt="Made for Web" width={42} height={42} /><strong>Made for Web</strong></div>
+      </div>
+      <div className="footer-bottom">© 2026 RowMotion AI <span>|</span> Développé par Made for Web. Tous droits réservés.</div>
+      <a className="footer-chat" href="mailto:contact@rowmotion.ai" aria-label="Contacter RowMotion AI"><MessageCircle /></a>
+    </footer>
+  );
+}
