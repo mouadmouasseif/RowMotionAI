@@ -1,5 +1,11 @@
 node_modules/
 .next/
 .env*.local
+.env
+.env.production
+serviceAccount*.json
+firebase-admin*.json
+*.pem
+*.key
 *.log
 *.tsbuildinfo

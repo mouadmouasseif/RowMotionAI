@@ -1,0 +1,16 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    function signedIn() { return request.auth != null; }
+    function profile() { return firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data; }
+    function active() { return signedIn() && profile().active == true; }
+    function superAdmin() { return active() && profile().role == "superadmin"; }
+    match /analyses/{ownerId}/{analysisId}/{fileName} {
+      allow read: if active() && (request.auth.uid == ownerId || superAdmin());
+      allow create: if active() && request.auth.uid == ownerId
+        && request.resource.size < 250 * 1024 * 1024
+        && request.resource.contentType.matches('video/(mp4|quicktime|webm)');
+      allow update, delete: if active() && (request.auth.uid == ownerId || superAdmin());
+    }
+  }
+}

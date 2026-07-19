@@ -1,0 +1,19 @@
+"use client";
+import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
+import { Camera, FileVideo, Plus, Search, Trash2 } from "lucide-react";
+import { AppShell } from "@/components/AppShell";
+import { ProtectedPage } from "@/components/ProtectedPage";
+import { useAuth } from "@/providers/AuthProvider";
+import { listAnalyses, removeAnalysis } from "@/services/analysis-service";
+import type { AnalysisEnvironment, AnalysisStatus, RowingAnalysis } from "@/types/analysis";
+
+function AnalysesContent() {
+  const { profile } = useAuth(); const [items, setItems] = useState<RowingAnalysis[]>([]); const [loading, setLoading] = useState(true); const [error, setError] = useState("");
+  const [search, setSearch] = useState(""); const [environment, setEnvironment] = useState<"" | AnalysisEnvironment>(""); const [status, setStatus] = useState<"" | AnalysisStatus>("");
+  useEffect(() => { if (!profile) return; setLoading(true); void listAnalyses(profile).then(setItems).catch(() => setError("Impossible de charger les analyses.")).finally(() => setLoading(false)); }, [profile]);
+  const filtered = useMemo(() => items.filter((item) => (!search || item.athleteName.toLowerCase().includes(search.toLowerCase())) && (!environment || item.environment === environment) && (!status || item.status === status)), [items, search, environment, status]);
+  if (!profile) return null;
+  return <AppShell title="Analyses vidéo" subtitle="Bibliothèque biomécanique"><div className="page-actions"><Link className="button primary" href="/analyses/nouvelle"><Plus />Nouvelle analyse</Link><Link className="button ghost" href="/analyses/live"><Camera />Analyse en direct</Link></div><div className="filter-bar"><label><Search /><input aria-label="Rechercher un athlète" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Rechercher un athlète" /></label><select value={environment} onChange={(e) => setEnvironment(e.target.value as "" | AnalysisEnvironment)}><option value="">Tous les environnements</option><option value="boat">Bateau</option><option value="ergometer">Ergomètre</option></select><select value={status} onChange={(e) => setStatus(e.target.value as "" | AnalysisStatus)}><option value="">Tous les statuts</option><option value="uploading">Import</option><option value="processing">Traitement</option><option value="completed">Terminée</option><option value="failed">Échec</option></select></div>{loading ? <div className="loading-card">Chargement des analyses…</div> : error ? <div className="error-card">{error}</div> : filtered.length === 0 ? <div className="empty-state"><FileVideo /><h2>Aucune analyse trouvée</h2><p>Commencez par importer une vidéo ou ajustez les filtres.</p></div> : <div className="data-grid">{filtered.map((item) => <article className="data-card" key={item.id}><div className="card-heading"><span className={`status-pill ${item.status}`}>{item.status}</span><small>{item.environment === "boat" ? "Bateau" : "Ergomètre"} · {item.sourceType}</small></div><h2>{item.athleteName || "Athlète"}</h2><p>Score technique : <strong>{item.technicalScore ?? "En attente"}</strong></p><div className="card-actions"><Link className="button ghost" href={`/analyses/${item.id}`}>Voir le détail</Link>{(profile.role === "superadmin" || profile.uid === item.createdBy) && <button className="danger-button" aria-label="Supprimer" onClick={async () => { if (!confirm("Supprimer cette analyse ?")) return; try { await removeAnalysis(item.id, profile); setItems((current) => current.filter((analysis) => analysis.id !== item.id)); } catch (reason) { setError(reason instanceof Error ? reason.message : "Suppression impossible."); } }}><Trash2 /></button>}</div></article>)}</div>}</AppShell>;
+}
+export default function AnalysesPage() { return <ProtectedPage><AnalysesContent /></ProtectedPage>; }
