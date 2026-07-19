@@ -3,8 +3,8 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { motion } from "framer-motion";
 import { Eye, EyeOff, LockKeyhole, Mail, ShieldCheck, UserRound } from "lucide-react";
-import { useRouter, useSearchParams } from "next/navigation";
-import { Suspense, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { Brand } from "@/components/Brand";
@@ -26,7 +26,6 @@ const roles = [
 
 function LoginContent() {
   const router = useRouter();
-  const registration = useSearchParams().get("mode") === "inscription";
   const [showPassword, setShowPassword] = useState(false);
   const [role, setRole] = useState<UserRole>("athlete");
   const [serverError, setServerError] = useState("");
@@ -57,7 +56,7 @@ function LoginContent() {
       <section className="auth-panel">
         <div className="mobile-brand"><Brand compact /></div>
         <motion.div className="auth-card" initial={{ opacity: 0, x: 22 }} animate={{ opacity: 1, x: 0 }}>
-          <div className="auth-heading"><span className="auth-icon"><UserRound /></span><h2>{registration ? "Créer votre accès" : "Heureux de vous revoir"}</h2><p>{registration ? "Choisissez votre profil pour commencer." : "Connectez-vous à votre espace RowMotion AI."}</p></div>
+          <div className="auth-heading"><span className="auth-icon"><UserRound /></span><h2>Heureux de vous revoir</h2><p>Connectez-vous à votre espace RowMotion AI.</p></div>
           <div className="role-picker" aria-label="Type de profil">
             {roles.map(({ value, label }) => <button type="button" className={role === value ? "selected" : ""} key={value} onClick={() => setRole(value)}>{label}</button>)}
           </div>
@@ -71,9 +70,9 @@ function LoginContent() {
             {role === "superadmin" && <><label className="field-label super-code-label" htmlFor="super-code">Code d’accès Super administrateur</label><div className="input-shell"><ShieldCheck /><input id="super-code" type="password" value={superAdminCode} onChange={(event) => setSuperAdminCode(event.target.value)} placeholder="ROW-SUPER-XXXX" /></div></>}
             <label className="remember"><input type="checkbox" {...register("remember")} /> Rester connecté sur cet appareil</label>
             {serverError && <div className="auth-error">{serverError}</div>}
-            <button className="submit-button" disabled={isSubmitting}>{isSubmitting ? "Connexion…" : registration ? "Continuer" : "Se connecter"}</button>
+            <button className="submit-button" disabled={isSubmitting}>{isSubmitting ? "Connexion…" : "Se connecter"}</button>
           </form>
-          <p className="signup-line">Pas encore de compte ? <a href="/connexion?mode=inscription">Demander un accès</a></p>
+          <p className="signup-line">Pas encore de compte ? <a href="/inscription">Créer un compte</a></p>
           <p className="legal">En vous connectant, vous acceptez les conditions d’utilisation et la politique de confidentialité.</p>
         </motion.div>
       </section>
@@ -81,4 +80,4 @@ function LoginContent() {
   );
 }
 
-export default function LoginPage() { return <Suspense fallback={<main className="auth-page" />}><LoginContent /></Suspense>; }
+export default function LoginPage() { return <LoginContent />; }

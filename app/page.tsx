@@ -62,7 +62,7 @@ export default function Home() {
 
         <div className="nav-actions">
           <Link className="button ghost" href="/connexion">Se connecter</Link>
-          <Link className="button primary" href="/connexion?mode=inscription">Commencer</Link>
+          <Link className="button primary" href="/inscription">Commencer</Link>
         </div>
       </header>
 

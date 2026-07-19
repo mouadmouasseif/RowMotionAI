@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { onAuthStateChanged, signOut, type User } from "firebase/auth";
-import { doc, getDoc } from "firebase/firestore";
+import { doc, getDoc } from "firebase/firestore/lite";
 import { auth, db } from "@/lib/firebase";
 import { createUserProfile } from "@/services/auth-service";
 import type { UserProfile } from "@/types/user";
@@ -29,7 +29,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setLoading(true);
       if (!firebaseUser) { setUser(null); setProfile(null); setLoading(false); return; }
       try {
-        const snapshot = await getDoc(doc(currentDb, "users", firebaseUser.uid));
+        let snapshot = await getDoc(doc(currentDb, "users", firebaseUser.uid));
+        // La création Authentication précède de quelques millisecondes l’écriture du profil.
+        for (let attempt = 0; !snapshot.exists() && attempt < 4; attempt += 1) {
+          await new Promise((resolve) => setTimeout(resolve, 250));
+          snapshot = await getDoc(doc(currentDb, "users", firebaseUser.uid));
+        }
         if (!snapshot.exists()) throw new Error("Profil absent");
         const loadedProfile = createUserProfile(firebaseUser.uid, firebaseUser.email, snapshot.data());
         if (!loadedProfile.active) throw new Error("Compte désactivé");

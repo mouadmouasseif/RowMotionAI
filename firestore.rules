@@ -2,19 +2,33 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    function isAuthenticated() { return request.auth != null; }
-    function currentProfile() {
+    function signedIn() { return request.auth != null; }
+    function userProfile() {
       return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
     }
-    function isActive() { return isAuthenticated() && currentProfile().active == true; }
-    function hasRole(roleName) { return isActive() && currentProfile().role == roleName; }
-    function isSuperAdmin() { return hasRole("superadmin"); }
+    function isActive() { return signedIn() && userProfile().active == true; }
+    function isSuperAdmin() { return isActive() && userProfile().role == "superadmin"; }
+    function validPublicRole(role) {
+      return role == "athlete" || role == "coach" || role == "club_admin";
+    }
 
     match /users/{userId} {
-      allow read: if isAuthenticated() && (request.auth.uid == userId || isSuperAdmin());
-      allow create: if isSuperAdmin();
+      allow create: if signedIn()
+        && request.auth.uid == userId
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.email == request.auth.token.email
+        && validPublicRole(request.resource.data.role)
+        && (
+          (request.resource.data.role == "athlete" && request.resource.data.active == true)
+          || ((request.resource.data.role == "coach" || request.resource.data.role == "club_admin") && request.resource.data.active == false)
+        );
+
+      allow read: if signedIn() && (request.auth.uid == userId || isSuperAdmin());
       allow update: if isSuperAdmin() || (
-        request.auth.uid == userId
+        signedIn()
+        && request.auth.uid == userId
+        && request.resource.data.uid == resource.data.uid
+        && request.resource.data.email == resource.data.email
         && request.resource.data.role == resource.data.role
         && request.resource.data.active == resource.data.active
       );

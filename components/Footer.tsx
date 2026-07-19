@@ -12,9 +12,9 @@ export function Footer() {
           <Link href="/politique-de-confidentialite">Politique de confidentialité</Link>
           <Link href="/conditions-utilisation">Conditions d’utilisation</Link>
         </nav>
-        <div className="footer-credit"><span>Développé par</span><Image src="/made-for-web.png" alt="Made for Web" width={42} height={42} /><strong>Made for Web</strong></div>
+        <div className="footer-credit"><span>Développé par</span><Image src="/made-for-web.png" alt="Mouad Mouasseif" width={42} height={42} /><strong>Mouad Mouasseif</strong></div>
       </div>
-      <div className="footer-bottom">© 2026 RowMotion AI <span>|</span> Développé par Made for Web. Tous droits réservés.</div>
+      <div className="footer-bottom">© 2026 RowMotion AI <span>|</span> Développé par Mouad Mouasseif. Tous droits réservés.</div>
       <a className="footer-chat" href="mailto:contact@rowmotion.ai" aria-label="Contacter RowMotion AI"><MessageCircle /></a>
     </footer>
   );

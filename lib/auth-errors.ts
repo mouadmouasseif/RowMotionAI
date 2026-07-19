@@ -6,6 +6,8 @@ const messages: Record<string, string> = {
   "auth/user-disabled": "Ce compte a été désactivé.",
   "auth/too-many-requests": "Trop de tentatives. Réessayez plus tard.",
   "auth/network-request-failed": "Vérifiez votre connexion Internet.",
+  "unavailable": "Impossible de joindre Firestore. Désactivez temporairement votre bloqueur de contenu puis réessayez.",
+  "permission-denied": "Votre compte n’est pas autorisé à lire ce profil.",
 };
 
 export function getAuthErrorMessage(error: unknown): string {

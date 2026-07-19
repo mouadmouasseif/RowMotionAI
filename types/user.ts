@@ -1,13 +1,19 @@
-export type UserRole = "athlete" | "coach" | "club_admin" | "superadmin";
+export type PublicRegistrationRole = "athlete" | "coach" | "club_admin";
+export type UserRole = PublicRegistrationRole | "superadmin";
 
 export interface UserProfile {
   uid: string;
   email: string;
-  firstName?: string;
-  lastName?: string;
+  firstName: string;
+  lastName: string;
   role: UserRole;
   active: boolean;
-  clubId?: string | null;
+  clubId: string | null;
+  coachId: string | null;
+  licenseNumber: string | null;
+  phone: string | null;
+  createdAt?: unknown;
+  updatedAt?: unknown;
 }
 
 export const userRoles: UserRole[] = ["athlete", "coach", "club_admin", "superadmin"];

@@ -1,5 +1,5 @@
 import { signInWithEmailAndPassword, signOut } from "firebase/auth";
-import { doc, getDoc } from "firebase/firestore";
+import { doc, getDoc } from "firebase/firestore/lite";
 import { auth, db } from "@/lib/firebase";
 import { isUserRole, type UserProfile, type UserRole } from "@/types/user";
 
@@ -12,6 +12,9 @@ interface LoginParams {
 
 export function createUserProfile(uid: string, authEmail: string | null, data: Record<string, unknown>): UserProfile {
   if (!isUserRole(data.role)) throw new Error("Le profil possède un rôle invalide.");
+  if (typeof data.uid === "string" && data.uid !== uid) {
+    throw new Error("L’UID du profil Firestore ne correspond pas au compte Authentication.");
+  }
   return {
     uid,
     email: typeof data.email === "string" ? data.email : authEmail ?? "",
@@ -20,6 +23,11 @@ export function createUserProfile(uid: string, authEmail: string | null, data: R
     role: data.role,
     active: data.active === true,
     clubId: typeof data.clubId === "string" ? data.clubId : null,
+    coachId: typeof data.coachId === "string" ? data.coachId : null,
+    licenseNumber: typeof data.licenseNumber === "string" ? data.licenseNumber : null,
+    phone: typeof data.phone === "string" ? data.phone : null,
+    createdAt: data.createdAt,
+    updatedAt: data.updatedAt,
   };
 }
 
