@@ -6,8 +6,11 @@ import { PwaProvider } from "@/components/pwa/PwaProvider";
 import { ServiceWorkerRegister } from "@/components/pwa/ServiceWorkerRegister";
 import { NetworkStatus } from "@/components/pwa/NetworkStatus";
 import { InstallBanner } from "@/components/pwa/InstallBanner";
+import { CookieConsent } from "@/components/CookieConsent";
+import { siteConfig } from "@/config/site";
 
 export const metadata: Metadata = {
+  metadataBase: new URL(siteConfig.url),
   title: { default: "RowMotion AI", template: "%s | RowMotion AI" },
   description: "Plateforme d’analyse biomécanique pour l’aviron en bateau et sur ergomètre.",
   manifest: "/manifest.webmanifest",
@@ -26,5 +29,5 @@ export const metadata: Metadata = {
 export const viewport: Viewport = { themeColor: "#0b5cff", width: "device-width", initialScale: 1, viewportFit: "cover" };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  return <html lang="fr" suppressHydrationWarning><body><PwaProvider><AuthProvider><FirebaseAnalytics /><ServiceWorkerRegister /><NetworkStatus />{children}<InstallBanner /></AuthProvider></PwaProvider></body></html>;
+  return <html lang="fr" suppressHydrationWarning><body><PwaProvider><AuthProvider><FirebaseAnalytics /><ServiceWorkerRegister /><NetworkStatus />{children}<CookieConsent/><InstallBanner /></AuthProvider></PwaProvider></body></html>;
 }

@@ -1,0 +1,1 @@
+"use client"; export default function ErrorPage({reset}:{reset:()=>void}){return <main className="state-page"><span>Erreur</span><h1>Une erreur est survenue</h1><p>Réessayez. Si le problème persiste, revenez à l’accueil.</p><button className="button primary" onClick={reset}>Réessayer</button></main>;}

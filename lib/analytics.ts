@@ -1,0 +1,2 @@
+export type PublicAnalyticsEvent = "cta_click" | "registration_start" | "login_success" | "analysis_start" | "video_upload_start" | "report_export" | "pwa_install";
+export function trackPublicEvent(name: PublicAnalyticsEvent, parameters: Record<string, string | number | boolean> = {}) { if (typeof window === "undefined" || localStorage.getItem("rowmotion-cookie-consent") !== "accepted") return; window.dispatchEvent(new CustomEvent("rowmotion-analytics", { detail: { name, parameters } })); }
