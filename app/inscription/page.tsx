@@ -4,6 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { motion } from "framer-motion";
 import { Building2, Eye, EyeOff, IdCard, LockKeyhole, Mail, Phone, ShieldCheck, UserRound } from "lucide-react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -64,7 +65,7 @@ export default function RegistrationPage() {
         {role !== "athlete" && <div className="approval-note"><ShieldCheck /> {role === "coach" ? "Votre compte devra être validé par un administrateur de club ou un Super administrateur." : "Votre compte devra être validé par le Super administrateur."}</div>}
         <label className="remember terms-check"><input type="checkbox" {...register("termsAccepted")} /> J’accepte les conditions d’utilisation et la politique de confidentialité.</label>{errors.termsAccepted && <span className="field-error">{errors.termsAccepted.message}</span>}
         {serverError && <div className="auth-error">{serverError}</div>}<button className="submit-button" disabled={isSubmitting}>{isSubmitting ? "Création du compte…" : "Créer mon compte"}</button>
-      </form><p className="signup-line">Vous avez déjà un compte ? <a href="/connexion">Se connecter</a></p>
+      </form><p className="signup-line">Vous avez déjà un compte ? <Link href="/connexion">Se connecter</Link></p>
     </motion.div></section>
   </main>;
 }

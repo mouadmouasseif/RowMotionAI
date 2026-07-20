@@ -4,6 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { motion } from "framer-motion";
 import { Eye, EyeOff, LockKeyhole, Mail, ShieldCheck, UserRound } from "lucide-react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -72,7 +73,7 @@ function LoginContent() {
             {serverError && <div className="auth-error">{serverError}</div>}
             <button className="submit-button" disabled={isSubmitting}>{isSubmitting ? "Connexion…" : "Se connecter"}</button>
           </form>
-          <p className="signup-line">Pas encore de compte ? <a href="/inscription">Créer un compte</a></p>
+          <p className="signup-line">Pas encore de compte ? <Link href="/inscription">Créer un compte</Link></p>
           <p className="legal">En vous connectant, vous acceptez les conditions d’utilisation et la politique de confidentialité.</p>
         </motion.div>
       </section>

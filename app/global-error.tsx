@@ -1,0 +1,1 @@
+"use client"; export default function GlobalError({reset}:{reset:()=>void}){return <html lang="fr"><body><main className="state-page"><h1>RowMotion AI est momentanément indisponible</h1><button onClick={reset}>Réessayer</button></main></body></html>;}

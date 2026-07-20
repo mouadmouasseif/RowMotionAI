@@ -7,6 +7,8 @@ import { ProtectedPage } from "@/components/ProtectedPage";
 import { useAuth } from "@/providers/AuthProvider";
 import { getAnalysis, updateAnalysis } from "@/services/analysis-service";
 import { getLocalAnalysisVideo } from "@/services/local-video-service";
+import { SynchronizedAnalysisProvider } from "@/components/analysis/SynchronizedAnalysisContext";
+import { BiomechanicalVideoPlayer } from "@/components/video/BiomechanicalVideoPlayer";
 import type { RowingAnalysis } from "@/types/analysis";
 
 function AnalysisDetail({ analysisId }: { analysisId: string }) {
@@ -19,7 +21,8 @@ function AnalysisDetail({ analysisId }: { analysisId: string }) {
     {analysis.status === "processing" && <div className="notice-card"><Gauge /><div><strong>Analyse en préparation</strong><p>La vidéo est enregistrée. Le moteur biomécanique réel doit maintenant traiter le fichier.</p></div></div>}
     {analysis.status === "failed" && <div className="error-card"><AlertTriangle />L’analyse a échoué. <button onClick={() => void updateAnalysis(analysis.id, { status: "processing" }).then(() => setAnalysis({ ...analysis, status: "processing" }))}><RotateCcw />Réessayer</button></div>}
     {analysis.videoStorageMode === "local" && <div className="local-mode-banner"><strong>Vidéo locale</strong><span>{localVideoUrl ? "Disponible uniquement dans ce navigateur." : "Cette vidéo n’est pas disponible sur cet appareil ou a été effacée."}</span></div>}
-    {(analysis.videoUrl || localVideoUrl) && <video className="analysis-video" controls src={analysis.videoUrl ?? localVideoUrl} />}
+    {(analysis.videoUrl || localVideoUrl) && <SynchronizedAnalysisProvider><BiomechanicalVideoPlayer src={analysis.videoUrl ?? localVideoUrl} /></SynchronizedAnalysisProvider>}
+    {analysis.status !== "completed" && <p className="demo-warning">Analyse indisponible – aucune donnée biomécanique réelle calculée.</p>}
     <div className="metrics-grid">{Object.entries(analysis.metrics).map(([key, value]) => <article key={key}><small>{key}</small><strong>{value ?? "—"}</strong></article>)}</div>
     <div className="detail-columns"><section className="content-card"><h2><AlertTriangle />Erreurs détectées</h2>{analysis.errors.length ? <ul>{analysis.errors.map((item) => <li key={item}>{item}</li>)}</ul> : <p>Aucune erreur calculée pour le moment.</p>}</section><section className="content-card"><h2><CheckCircle2 />Recommandations</h2>{analysis.recommendations.length ? <ul>{analysis.recommendations.map((item) => <li key={item}>{item}</li>)}</ul> : <p>Disponibles après traitement biomécanique.</p>}</section></div>
     {["coach", "club_admin", "superadmin"].includes(profile.role) && <section className="content-card"><h2><MessageSquare />Note coach</h2><textarea value={note} onChange={(event) => setNote(event.target.value)} placeholder="Ajouter une observation technique…" /><button className="button primary" onClick={() => void updateAnalysis(analysis.id, { coachComment: note }).then(() => setAnalysis({ ...analysis, coachComment: note }))}>Enregistrer la note</button></section>}
