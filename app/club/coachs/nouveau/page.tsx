@@ -1,0 +1,15 @@
+"use client";
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { Send, ShieldAlert } from "lucide-react";
+import { AppShell } from "@/components/AppShell";
+import { ProtectedPage } from "@/components/ProtectedPage";
+import { useAuth } from "@/providers/AuthProvider";
+import { createCoachInvitation } from "@/services/club-service";
+
+function NewCoachContent() {
+  const { profile } = useAuth(); const router = useRouter(); const [error, setError] = useState(""); const [busy, setBusy] = useState(false);
+  if (!profile) return null;
+  return <AppShell title="Inviter un entraîneur" subtitle="Administration du club"><div className="notice-card"><ShieldAlert /><div><strong>Création sécurisée en deux étapes</strong><p>L’invitation est enregistrée maintenant. La création du compte Authentication devra être finalisée par Firebase Admin SDK ou une Cloud Function, afin de ne pas déconnecter l’administrateur.</p></div></div><form className="content-card form-card" onSubmit={(event) => { event.preventDefault(); const form = new FormData(event.currentTarget); setBusy(true); setError(""); void createCoachInvitation(profile, { firstName: String(form.get("firstName") ?? ""), lastName: String(form.get("lastName") ?? ""), email: String(form.get("email") ?? ""), phone: String(form.get("phone") ?? ""), birthDate: String(form.get("birthDate") ?? ""), licenseNumber: String(form.get("licenseNumber") ?? ""), specialty: String(form.get("specialty") ?? ""), clubId: profile.clubId ?? String(form.get("clubId") ?? ""), active: form.get("active") === "on" }).then(() => router.push("/coaches")).catch((reason) => setError(reason instanceof Error ? reason.message : "Invitation impossible.")).finally(() => setBusy(false)); }}><div className="form-grid"><label className="plain-field">Prénom<input name="firstName" minLength={2} required /></label><label className="plain-field">Nom<input name="lastName" minLength={2} required /></label><label className="plain-field">E-mail<input name="email" type="email" required /></label><label className="plain-field">Téléphone<input name="phone" /></label><label className="plain-field">Date de naissance<input name="birthDate" type="date" /></label><label className="plain-field">Numéro de licence<input name="licenseNumber" required /></label><label className="plain-field">Spécialité<input name="specialty" placeholder="Ergomètre, bateau…" /></label>{profile.role === "superadmin" && <label className="plain-field">Identifiant du club<input name="clubId" required /></label>}<label className="toggle-field"><input name="active" type="checkbox" defaultChecked />Activer après création serveur</label></div>{error && <div className="error-card">{error}</div>}<button className="button primary" disabled={busy}><Send />{busy ? "Enregistrement…" : "Enregistrer l’invitation"}</button></form></AppShell>;
+}
+export default function NewCoachPage() { return <ProtectedPage allowedRoles={["club_admin", "superadmin"]}><NewCoachContent /></ProtectedPage>; }

@@ -26,6 +26,14 @@ export function createUserProfile(uid: string, authEmail: string | null, data: R
     coachId: typeof data.coachId === "string" ? data.coachId : null,
     licenseNumber: typeof data.licenseNumber === "string" ? data.licenseNumber : null,
     phone: typeof data.phone === "string" ? data.phone : null,
+    profilePhotoUrl: typeof data.profilePhotoUrl === "string" ? data.profilePhotoUrl : null,
+    birthDate: data.birthDate ?? null,
+    specialty: typeof data.specialty === "string" ? data.specialty : null,
+    category: typeof data.category === "string" ? data.category : null,
+    level: typeof data.level === "string" ? data.level : null,
+    height: typeof data.height === "number" ? data.height : null,
+    weight: typeof data.weight === "number" ? data.weight : null,
+    legacyAge: typeof data.age === "number" ? data.age : null,
     createdAt: data.createdAt,
     updatedAt: data.updatedAt,
   };
@@ -54,7 +62,11 @@ export async function loginUser({ email, password, selectedRole, superAdminCode 
     const snapshot = await getDoc(doc(db, "users", credential.user.uid));
     if (!snapshot.exists()) throw new Error("Le compte existe, mais son profil n’est pas configuré.");
     const profile = createUserProfile(credential.user.uid, credential.user.email, snapshot.data());
-    if (!profile.active) throw new Error("Ce compte a été désactivé.");
+    if (!profile.active) {
+      if (profile.role === "coach") throw new Error("Votre compte entraîneur est en attente de validation par un administrateur.");
+      if (profile.role === "club_admin") throw new Error("Votre compte administrateur de club est en attente de validation par le Super administrateur.");
+      throw new Error("Ce compte a été désactivé.");
+    }
     if (profile.role !== selectedRole) throw new Error("Le rôle sélectionné ne correspond pas à ce compte.");
     return profile;
   } catch (error) {

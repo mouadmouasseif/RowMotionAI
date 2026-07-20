@@ -48,6 +48,14 @@ export async function registerUser(input: RegisterUserInput): Promise<UserProfil
       coachId: input.coachId?.trim() || null,
       licenseNumber: input.licenseNumber?.trim() || null,
       phone: input.phone?.trim() || null,
+      profilePhotoUrl: null,
+      birthDate: null,
+      specialty: null,
+      category: null,
+      level: null,
+      height: null,
+      weight: null,
+      legacyAge: null,
     };
     await setDoc(doc(db, "users", credential.user.uid), { ...profile, createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
     return profile;

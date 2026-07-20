@@ -42,7 +42,7 @@ export async function createAnalysis(input: { athleteId: string; athleteName: st
     coachId: input.profile.role === "coach" ? input.profile.uid : input.profile.coachId,
     clubId: input.profile.clubId, createdBy: user.uid, sourceType: input.sourceType,
     environment: input.environment, status: input.sourceType === "video" ? "uploading" : "draft",
-    videoUrl: null, storagePath: null, thumbnailUrl: null, fileName: input.fileName ?? null,
+    videoUrl: null, storagePath: null, videoStorageMode: "none", thumbnailUrl: null, fileName: input.fileName ?? null,
     durationSeconds: null, technicalScore: null, metrics: emptyAnalysisMetrics,
     phases: {}, errors: [], recommendations: [], coachComment: null,
     createdAt: serverTimestamp(), updatedAt: serverTimestamp(),

@@ -5,6 +5,19 @@ service firebase.storage {
     function profile() { return firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data; }
     function active() { return signedIn() && profile().active == true; }
     function superAdmin() { return active() && profile().role == "superadmin"; }
+    function clubAdminFor(clubId) { return active() && profile().role == "club_admin" && profile().clubId == clubId; }
+    function imageFile() { return request.resource.size < 5 * 1024 * 1024 && request.resource.contentType.matches('image/(jpeg|png|webp)'); }
+
+    match /profile-photos/{userId}/{fileName} {
+      allow read: if active();
+      allow create, update: if imageFile() && (request.auth.uid == userId || superAdmin());
+      allow delete: if request.auth.uid == userId || superAdmin();
+    }
+    match /clubs/{clubId}/{fileName} {
+      allow read: if true;
+      allow create, update: if imageFile() && (clubAdminFor(clubId) || superAdmin());
+      allow delete: if clubAdminFor(clubId) || superAdmin();
+    }
     match /analyses/{ownerId}/{analysisId}/{fileName} {
       allow read: if active() && (request.auth.uid == ownerId || superAdmin());
       allow create: if active() && request.auth.uid == ownerId

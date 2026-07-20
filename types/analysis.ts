@@ -1,6 +1,7 @@
 export type AnalysisEnvironment = "boat" | "ergometer";
 export type AnalysisSource = "video" | "live";
 export type AnalysisStatus = "draft" | "uploading" | "processing" | "completed" | "failed";
+export type VideoStorageMode = "local" | "firebase" | "none";
 
 export interface AnalysisMetrics {
   backAngle: number | null;
@@ -28,6 +29,7 @@ export interface RowingAnalysis {
   status: AnalysisStatus;
   videoUrl: string | null;
   storagePath: string | null;
+  videoStorageMode: VideoStorageMode;
   thumbnailUrl: string | null;
   fileName: string | null;
   durationSeconds: number | null;

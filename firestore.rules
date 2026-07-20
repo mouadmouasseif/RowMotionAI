@@ -1,37 +1,91 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    function signedIn() { return request.auth != null; }
-    function profile() { return get(/databases/$(database)/documents/users/$(request.auth.uid)).data; }
-    function active() { return signedIn() && profile().active == true; }
-    function role(name) { return active() && profile().role == name; }
-    function superAdmin() { return role("superadmin"); }
-    function sameClub(data) { return profile().clubId != null && profile().clubId == data.clubId; }
+    function isSignedIn() { return request.auth != null; }
+    function currentProfile() { return get(/databases/$(database)/documents/users/$(request.auth.uid)).data; }
+    function isActive() { return isSignedIn() && currentProfile().active == true; }
+    function isSuperAdmin() { return isActive() && currentProfile().role == "superadmin"; }
+    function isClubAdmin() { return isActive() && currentProfile().role == "club_admin"; }
+    function isCoach() { return isActive() && currentProfile().role == "coach"; }
+    function isOwnUser(userId) { return isSignedIn() && request.auth.uid == userId; }
+    function sameClub(clubId) { return isActive() && clubId != null && currentProfile().clubId == clubId; }
+    function validPublicRole(value) { return value == "athlete" || value == "coach" || value == "club_admin"; }
     function ownsAnalysis(data) { return data.athleteId == request.auth.uid || data.createdBy == request.auth.uid || data.coachId == request.auth.uid; }
-    function canReadAnalysis(data) { return active() && (superAdmin() || ownsAnalysis(data) || (role("club_admin") && sameClub(data))); }
-    function publicRole(value) { return value == "athlete" || value == "coach" || value == "club_admin"; }
+    function canReadAnalysis(data) { return isActive() && (isSuperAdmin() || ownsAnalysis(data) || (isClubAdmin() && sameClub(data.clubId))); }
 
     match /users/{userId} {
-      allow create: if signedIn() && request.auth.uid == userId && request.resource.data.uid == userId && publicRole(request.resource.data.role);
-      allow read: if active() && (request.auth.uid == userId || superAdmin() || (role("coach") && resource.data.coachId == request.auth.uid) || (role("club_admin") && sameClub(resource.data)));
-      allow update: if superAdmin() || (active() && request.auth.uid == userId && request.resource.data.diff(resource.data).affectedKeys().hasOnly(["firstName", "lastName", "phone", "height", "weight", "updatedAt"]));
-      allow delete: if superAdmin();
+      allow create: if isSignedIn() && request.auth.uid == userId
+        && request.resource.data.uid == userId && validPublicRole(request.resource.data.role);
+
+      // Le propriétaire lit son profil même si son compte attend une validation.
+      allow read: if isOwnUser(userId)
+        || (isActive() && (
+          isSuperAdmin()
+          || (isCoach() && resource.data.role == "athlete" && resource.data.coachId == request.auth.uid)
+          || (isClubAdmin() && sameClub(resource.data.clubId))
+          || (currentProfile().role == "athlete" && currentProfile().coachId == userId && resource.data.role == "coach")
+        ));
+
+      // Un utilisateur ne peut jamais modifier lui-même role, active, clubId ou coachId.
+      allow update: if isSuperAdmin()
+        || (isClubAdmin() && sameClub(resource.data.clubId)
+          && request.resource.data.role == resource.data.role
+          && request.resource.data.uid == resource.data.uid
+          && request.resource.data.email == resource.data.email
+          && request.resource.data.clubId == resource.data.clubId)
+        || (isOwnUser(userId)
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            "firstName", "lastName", "phone", "profilePhotoUrl", "birthDate",
+            "specialty", "category", "level", "height", "weight", "updatedAt"
+          ]));
+      allow delete: if isSuperAdmin();
     }
+
+    match /clubs/{clubId} {
+      allow read: if isActive() && (isSuperAdmin() || sameClub(clubId));
+      allow create: if isSuperAdmin() && request.resource.data.createdBy == request.auth.uid;
+      allow update: if isSuperAdmin() || (isClubAdmin() && sameClub(clubId));
+      allow delete: if isSuperAdmin();
+    }
+
     match /analyses/{analysisId} {
-      allow create: if active() && request.resource.data.createdBy == request.auth.uid && (request.resource.data.athleteId == request.auth.uid || role("coach") || role("club_admin") || superAdmin());
+      allow create: if isActive() && request.resource.data.createdBy == request.auth.uid
+        && (request.resource.data.athleteId == request.auth.uid || isCoach() || isClubAdmin() || isSuperAdmin());
       allow read: if canReadAnalysis(resource.data);
-      allow update: if superAdmin() || (role("coach") && ownsAnalysis(resource.data)) || (role("club_admin") && sameClub(resource.data))
-        || (active() && resource.data.createdBy == request.auth.uid
-          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(["videoUrl", "storagePath", "fileName", "durationSeconds", "status", "updatedAt"]));
-      allow delete: if superAdmin() || resource.data.createdBy == request.auth.uid || (role("club_admin") && sameClub(resource.data));
+      allow update: if isSuperAdmin() || (isCoach() && ownsAnalysis(resource.data))
+        || (isClubAdmin() && sameClub(resource.data.clubId))
+        || (isActive() && resource.data.createdBy == request.auth.uid
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            "videoUrl", "storagePath", "videoStorageMode", "fileName",
+            "durationSeconds", "status", "updatedAt"
+          ]));
+      allow delete: if isSuperAdmin() || resource.data.createdBy == request.auth.uid
+        || (isClubAdmin() && sameClub(resource.data.clubId));
     }
+
     match /notifications/{notificationId} {
-      allow read, update, delete: if active() && (resource.data.userId == request.auth.uid || superAdmin());
-      allow create: if active() && (request.resource.data.userId == request.auth.uid || role("coach") || role("club_admin") || superAdmin());
+      allow read, update, delete: if isActive() && (resource.data.userId == request.auth.uid || isSuperAdmin());
+      allow create: if isActive() && (
+        request.resource.data.userId == request.auth.uid || isCoach() || isClubAdmin() || isSuperAdmin()
+      );
     }
-    match /coachNotes/{noteId} { allow read, write: if active() && (superAdmin() || resource.data.coachId == request.auth.uid || resource.data.athleteId == request.auth.uid); }
-    match /progressMetrics/{metricId} { allow read: if active() && (superAdmin() || resource.data.userId == request.auth.uid || (role("club_admin") && sameClub(resource.data))); allow write: if superAdmin(); }
-    match /clubs/{clubId} { allow read: if active(); allow write: if superAdmin(); }
-    match /{document=**} { allow read, write: if superAdmin(); }
+
+    match /coachInvitations/{invitationId} {
+      allow create: if isSuperAdmin() || (isClubAdmin() && request.resource.data.clubId == currentProfile().clubId && request.resource.data.requestedBy == request.auth.uid);
+      allow read, update: if isSuperAdmin() || (isClubAdmin() && resource.data.clubId == currentProfile().clubId);
+      allow delete: if isSuperAdmin();
+    }
+
+    match /coachNotes/{noteId} {
+      allow read: if isActive() && (isSuperAdmin() || resource.data.coachId == request.auth.uid || resource.data.athleteId == request.auth.uid || (isClubAdmin() && sameClub(resource.data.clubId)));
+      allow create, update: if isSuperAdmin() || (isCoach() && request.resource.data.coachId == request.auth.uid) || (isClubAdmin() && sameClub(request.resource.data.clubId));
+      allow delete: if isSuperAdmin() || (isCoach() && resource.data.coachId == request.auth.uid);
+    }
+
+    match /progressMetrics/{metricId} {
+      allow read: if isActive() && (isSuperAdmin() || resource.data.userId == request.auth.uid || (isClubAdmin() && sameClub(resource.data.clubId)));
+      allow write: if isSuperAdmin();
+    }
+    match /{document=**} { allow read, write: if isSuperAdmin(); }
   }
 }

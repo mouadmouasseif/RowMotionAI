@@ -3,6 +3,7 @@ import { auth, storage } from "@/lib/firebase";
 
 const allowedTypes = ["video/mp4", "video/quicktime", "video/webm"];
 export const MAX_VIDEO_SIZE = 250 * 1024 * 1024;
+export const isCloudVideoStorageEnabled = process.env.NEXT_PUBLIC_VIDEO_STORAGE_MODE === "firebase";
 
 export function validateAnalysisVideo(file: File) {
   if (!allowedTypes.includes(file.type)) throw new Error("Format vidéo non pris en charge. Utilisez MP4, MOV ou WebM.");

@@ -12,6 +12,14 @@ export interface UserProfile {
   coachId: string | null;
   licenseNumber: string | null;
   phone: string | null;
+  profilePhotoUrl: string | null;
+  birthDate: unknown | null;
+  specialty: string | null;
+  category: string | null;
+  level: string | null;
+  height: number | null;
+  weight: number | null;
+  legacyAge: number | null;
   createdAt?: unknown;
   updatedAt?: unknown;
 }
