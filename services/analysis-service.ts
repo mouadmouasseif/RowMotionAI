@@ -52,7 +52,7 @@ export async function createAnalysis(input: { athleteId: string; athleteName: st
 
 export async function updateAnalysis(id: string, values: Partial<RowingAnalysis>) {
   const { database } = requireFirebase();
-  const { id: _ignored, ...safeValues } = values;
+  const safeValues = { ...values }; delete safeValues.id;
   await updateDoc(doc(database, "analyses", id), { ...safeValues, updatedAt: serverTimestamp() });
 }
 

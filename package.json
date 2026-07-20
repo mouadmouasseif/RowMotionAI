@@ -6,7 +6,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint",
+    "lint": "eslint app components config content i18n lib providers services types scripts next.config.ts --ext .js,.mjs,.ts,.tsx --max-warnings=0",
     "typecheck": "tsc --noEmit",
     "test": "node scripts/check-public-site.mjs",
     "check": "npm run typecheck && npm run lint && npm run test && npm run build"
