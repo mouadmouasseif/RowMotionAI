@@ -1,4 +1,4 @@
-const CACHE_VERSION = "rowmotion-shell-v1";
+const CACHE_VERSION = "rowmotion-shell-v2";
 const OFFLINE_URL = "/offline";
 const PRECACHE = [
   OFFLINE_URL,
@@ -26,7 +26,7 @@ self.addEventListener("fetch", (event) => {
   const url = new URL(request.url);
 
   // Ne jamais intercepter Firebase, les API, les vidéos ou les routes d’administration serveur.
-  if (url.origin !== self.location.origin || url.pathname.startsWith("/api/") || url.pathname.startsWith("/analyses/") && /\.(mp4|mov|webm)$/i.test(url.pathname) || /\.(mp4|mov|webm)$/i.test(url.pathname)) return;
+  if (url.origin !== self.location.origin || url.pathname.startsWith("/api/") || url.pathname.startsWith("/admin/") || /\.(mp4|mov|webm|avi)$/i.test(url.pathname) || url.hostname.includes("firebasestorage") || url.hostname.includes("googleapis")) return;
 
   if (request.mode === "navigate") {
     event.respondWith(fetch(request).catch(() => caches.match(OFFLINE_URL)));
@@ -35,8 +35,8 @@ self.addEventListener("fetch", (event) => {
 
   const staticAsset = url.pathname.startsWith("/_next/static/") || url.pathname.startsWith("/icons/") || /\.(css|js|png|jpg|jpeg|webp|svg|ico|woff2?)$/i.test(url.pathname);
   if (!staticAsset) return;
-  event.respondWith(caches.match(request).then((cached) => cached || fetch(request).then((response) => {
-    if (response.ok && response.type === "basic") caches.open(CACHE_VERSION).then((cache) => cache.put(request, response.clone()));
-    return response;
-  })));
+  event.respondWith(caches.match(request).then(async (cached) => {
+    try { const response=await fetch(request); if(response.ok&&response.type==="basic"){const copy=response.clone();event.waitUntil(caches.open(CACHE_VERSION).then(cache=>cache.put(request,copy)));} return response; }
+    catch(error){if(cached)return cached;throw error;}
+  }));
 });

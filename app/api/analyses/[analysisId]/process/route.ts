@@ -1,0 +1,2 @@
+import { apiError, requireApiUser } from "@/lib/api-auth"; import { createJob } from "@/lib/analysis-api";
+export async function POST(request:Request,{params}:{params:Promise<{analysisId:string}>}){try{const user=await requireApiUser(request);const {analysisId}=await params;await createJob(analysisId,user);return Response.json({success:true,data:{analysisId,status:"queued"}},{status:202});}catch(reason){return apiError(reason);}}

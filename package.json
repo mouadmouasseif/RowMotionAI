@@ -9,6 +9,12 @@
     "lint": "eslint app components config content i18n lib providers services types scripts next.config.ts --ext .js,.mjs,.ts,.tsx --max-warnings=0",
     "typecheck": "tsc --noEmit",
     "test": "node scripts/check-public-site.mjs",
+    "test:e2e": "echo Playwright tests require emulator credentials",
+    "firebase:emulators": "firebase emulators:start",
+    "migrate:athletes:dry": "node --experimental-strip-types scripts/migrate-athletes.ts --dry-run",
+    "migrate:athletes": "node --experimental-strip-types scripts/migrate-athletes.ts",
+    "migrate:analyses:dry": "node --experimental-strip-types scripts/migrate-analyses.ts --dry-run",
+    "migrate:analyses": "node --experimental-strip-types scripts/migrate-analyses.ts",
     "check": "npm run typecheck && npm run lint && npm run test && npm run build"
   },
   "dependencies": {
@@ -17,6 +23,7 @@
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "firebase": "^12.16.0",
+    "firebase-admin": "^14.2.0",
     "framer-motion": "^11.15.0",
     "lucide-react": "^0.468.0",
     "next": "^15.1.3",

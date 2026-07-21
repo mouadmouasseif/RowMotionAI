@@ -35,7 +35,7 @@ service cloud.firestore {
           && request.resource.data.clubId == resource.data.clubId)
         || (isOwnUser(userId)
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-            "firstName", "lastName", "phone", "profilePhotoUrl", "birthDate",
+            "firstName", "lastName", "phone", "profilePhotoUrl", "birthDate", "trainingStartYear",
             "specialty", "category", "level", "height", "weight", "updatedAt"
           ]));
       allow delete: if isSuperAdmin();
@@ -57,11 +57,18 @@ service cloud.firestore {
         || (isActive() && resource.data.createdBy == request.auth.uid
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
             "videoUrl", "storagePath", "videoStorageMode", "fileName",
-            "durationSeconds", "status", "updatedAt"
+            "durationSeconds", "status", "progress", "updatedAt"
           ]));
       allow delete: if isSuperAdmin() || resource.data.createdBy == request.auth.uid
         || (isClubAdmin() && sameClub(resource.data.clubId));
     }
+    match /analyses/{analysisId}/{subcollection}/{documentId} {
+      allow read: if canReadAnalysis(get(/databases/$(database)/documents/analyses/$(analysisId)).data);
+      allow create, update, delete: if isSuperAdmin() || isCoach() || (isClubAdmin() && sameClub(get(/databases/$(database)/documents/analyses/$(analysisId)).data.clubId));
+    }
+    match /analysisJobs/{jobId} { allow read: if isSuperAdmin() || isClubAdmin(); allow write: if false; }
+    match /worldReferences/{referenceId} { allow read: if isActive(); allow write: if isSuperAdmin(); }
+    match /auditLogs/{logId} { allow read: if isSuperAdmin(); allow write: if false; }
 
     match /notifications/{notificationId} {
       allow read, update, delete: if isActive() && (resource.data.userId == request.auth.uid || isSuperAdmin());
