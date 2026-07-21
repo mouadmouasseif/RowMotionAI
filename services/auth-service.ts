@@ -28,6 +28,7 @@ export function createUserProfile(uid: string, authEmail: string | null, data: R
     phone: typeof data.phone === "string" ? data.phone : null,
     profilePhotoUrl: typeof data.profilePhotoUrl === "string" ? data.profilePhotoUrl : null,
     birthDate: data.birthDate ?? null,
+    trainingStartYear: typeof data.trainingStartYear === "number" ? data.trainingStartYear : null,
     specialty: typeof data.specialty === "string" ? data.specialty : null,
     category: typeof data.category === "string" ? data.category : null,
     level: typeof data.level === "string" ? data.level : null,

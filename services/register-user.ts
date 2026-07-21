@@ -13,6 +13,8 @@ export interface RegisterUserInput {
   clubId?: string;
   coachId?: string;
   licenseNumber?: string;
+  birthDate: string;
+  trainingStartYear: number;
 }
 
 function getInitialActiveStatus(role: PublicRegistrationRole): boolean {
@@ -49,7 +51,8 @@ export async function registerUser(input: RegisterUserInput): Promise<UserProfil
       licenseNumber: input.licenseNumber?.trim() || null,
       phone: input.phone?.trim() || null,
       profilePhotoUrl: null,
-      birthDate: null,
+      birthDate: input.birthDate,
+      trainingStartYear: input.trainingStartYear,
       specialty: null,
       category: null,
       level: null,

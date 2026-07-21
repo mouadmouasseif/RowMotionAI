@@ -1,6 +1,6 @@
-import { addDoc, collection, deleteDoc, doc, getDoc, getDocs, limit, orderBy, query, serverTimestamp, updateDoc, where } from "firebase/firestore/lite";
+import { addDoc, collection, deleteDoc, doc, getDoc, getDocs, limit, onSnapshot, orderBy, query, serverTimestamp, updateDoc, where } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
-import { emptyAnalysisMetrics, type AnalysisEnvironment, type AnalysisSource, type RowingAnalysis } from "@/types/analysis";
+import { emptyAnalysisMetrics, initialAnalysisProgress, type AnalysisEnvironment, type AnalysisSource, type RowingAnalysis } from "@/types/analysis";
 import type { UserProfile } from "@/types/user";
 
 function requireFirebase() {
@@ -42,6 +42,7 @@ export async function createAnalysis(input: { athleteId: string; athleteName: st
     coachId: input.profile.role === "coach" ? input.profile.uid : input.profile.coachId,
     clubId: input.profile.clubId, createdBy: user.uid, sourceType: input.sourceType,
     environment: input.environment, status: input.sourceType === "video" ? "uploading" : "draft",
+    progress: { ...initialAnalysisProgress, status: input.sourceType === "video" ? "uploading" : "draft", currentStep: input.sourceType === "video" ? "upload" : "validation" },
     videoUrl: null, storagePath: null, videoStorageMode: "none", thumbnailUrl: null, fileName: input.fileName ?? null,
     durationSeconds: null, technicalScore: null, metrics: emptyAnalysisMetrics,
     phases: {}, errors: [], recommendations: [], coachComment: null,
@@ -49,6 +50,26 @@ export async function createAnalysis(input: { athleteId: string; athleteName: st
   });
   return reference.id;
 }
+
+export function subscribeToAnalysis(id: string, profile: UserProfile, onValue: (analysis: RowingAnalysis) => void, onError: (error: Error) => void) {
+  const { database } = requireFirebase();
+  return onSnapshot(doc(database, "analyses", id), (snapshot) => {
+    if (!snapshot.exists()) { onError(new Error("Analyse introuvable.")); return; }
+    const analysis = { id: snapshot.id, ...snapshot.data() } as RowingAnalysis;
+    if (!canAccessAnalysis(profile, analysis)) { onError(new Error("Accès non autorisé.")); return; }
+    onValue(analysis);
+  }, (reason) => onError(reason));
+}
+
+async function authenticatedRequest(path: string) {
+  const { user } = requireFirebase();
+  const response = await fetch(path, { method: "POST", headers: { Authorization: `Bearer ${await user.getIdToken()}` } });
+  const body = await response.json() as { success:boolean; error?:{message:string} };
+  if (!response.ok || !body.success) throw new Error(body.error?.message ?? "Action impossible.");
+}
+export const queueAnalysis = (id: string) => authenticatedRequest(`/api/analyses/${id}/process`);
+export const cancelAnalysis = (id: string) => authenticatedRequest(`/api/analyses/${id}/cancel`);
+export const retryAnalysis = (id: string) => authenticatedRequest(`/api/analyses/${id}/retry`);
 
 export async function updateAnalysis(id: string, values: Partial<RowingAnalysis>) {
   const { database } = requireFirebase();

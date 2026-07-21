@@ -1,0 +1,4 @@
+import { applicationDefault,getApps,initializeApp } from "firebase-admin/app";import { FieldValue,getFirestore } from "firebase-admin/firestore";
+const dry=process.argv.includes("--dry-run");if(!getApps().length)initializeApp({credential:applicationDefault()});const db=getFirestore();const rows=await db.collection("analyses").get();let changed=0;
+for(const row of rows.docs){const data=row.data();if(data.metricsSource||!["processing","completed"].includes(data.status))continue;changed++;if(!dry)await row.ref.set({status:"failed",isLegacy:true,metricsSource:"legacy_simulation",progress:{status:"failed",progress:0,currentStep:"validation",processedFrames:0,totalFrames:0,errorCode:"LEGACY_ANALYSIS",errorMessage:"Ancienne analyse sans preuve de traitement biomécanique réel."},updatedAt:FieldValue.serverTimestamp()},{merge:true});}
+console.log(JSON.stringify({dryRun:dry,scanned:rows.size,changed},null,2));

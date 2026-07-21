@@ -2,21 +2,26 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { motion } from "framer-motion";
-import { Building2, Eye, EyeOff, IdCard, LockKeyhole, Mail, Phone, ShieldCheck, UserRound } from "lucide-react";
+import { Building2, CalendarDays, Eye, EyeOff, IdCard, ImagePlus, LockKeyhole, Mail, Phone, ShieldCheck, UserRound } from "lucide-react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { Brand } from "@/components/Brand";
 import { getFirebaseRegistrationError } from "@/lib/firebase-error";
 import { registerUser } from "@/services/register-user";
+import { uploadProfilePhoto, validateProfileImage } from "@/services/profile-media-service";
+
+const currentYear = new Date().getFullYear();
 
 const schema = z.object({
   firstName: z.string().trim().min(2, "Le prénom doit contenir au moins 2 caractères."),
   lastName: z.string().trim().min(2, "Le nom doit contenir au moins 2 caractères."),
   email: z.string().trim().email("Saisissez une adresse e-mail valide."),
   phone: z.string().optional(),
+  birthDate: z.string().min(1, "La date de naissance est requise.").refine((value) => new Date(value) < new Date(), "La date doit être dans le passé."),
+  trainingStartYear: z.string().regex(/^\d{4}$/, "Indiquez une année sur 4 chiffres.").refine((value) => Number(value) >= 1950 && Number(value) <= currentYear, `L’année doit être comprise entre 1950 et ${currentYear}.`),
   password: z.string().min(8, "Le mot de passe doit contenir au moins 8 caractères.").regex(/[A-Z]/, "Ajoutez au moins une majuscule.").regex(/[a-z]/, "Ajoutez au moins une minuscule.").regex(/[0-9]/, "Ajoutez au moins un chiffre."),
   confirmPassword: z.string(),
   role: z.enum(["athlete", "coach", "club_admin"]),
@@ -37,13 +42,17 @@ export default function RegistrationPage() {
   const router = useRouter();
   const [showPassword, setShowPassword] = useState(false);
   const [serverError, setServerError] = useState("");
+  const [photo, setPhoto] = useState<File | null>(null);
+  const [photoPreview, setPhotoPreview] = useState("");
   const { register, handleSubmit, watch, formState: { errors, isSubmitting } } = useForm<RegistrationValues>({ resolver: zodResolver(schema), defaultValues: { role: "athlete", termsAccepted: false } });
   const role = watch("role");
+  useEffect(() => () => { if (photoPreview) URL.revokeObjectURL(photoPreview); }, [photoPreview]);
 
   async function onSubmit(values: RegistrationValues) {
     setServerError("");
     try {
-      const profile = await registerUser(values);
+      const profile = await registerUser({ ...values, trainingStartYear: Number(values.trainingStartYear) });
+      if (photo) await uploadProfilePhoto(profile.uid, photo);
       if (profile.role === "athlete") router.replace("/athlete/dashboard");
       else router.replace(`/pending-approval?role=${profile.role}`);
       router.refresh();
@@ -59,6 +68,8 @@ export default function RegistrationPage() {
         <div className="form-grid"><Field label="Prénom" error={errors.firstName?.message}><div className="input-shell"><UserRound /><input placeholder="Mouad" {...register("firstName")} /></div></Field><Field label="Nom" error={errors.lastName?.message}><div className="input-shell"><UserRound /><input placeholder="Nom" {...register("lastName")} /></div></Field></div>
         <Field label="Adresse e-mail" error={errors.email?.message}><div className="input-shell"><Mail /><input type="email" autoComplete="email" placeholder="nom@club.fr" {...register("email")} /></div></Field>
         <Field label="Téléphone (facultatif)" error={errors.phone?.message}><div className="input-shell"><Phone /><input type="tel" placeholder="+212 6 00 00 00 00" {...register("phone")} /></div></Field>
+        <div className="form-grid"><Field label="Date de naissance" error={errors.birthDate?.message}><div className="input-shell"><CalendarDays /><input type="date" max={new Date().toISOString().slice(0, 10)} {...register("birthDate")} /></div></Field><Field label="Année de début d’entraînement" error={errors.trainingStartYear?.message}><div className="input-shell"><CalendarDays /><input type="number" min="1950" max={currentYear} placeholder={String(currentYear - 2)} {...register("trainingStartYear")} /></div></Field></div>
+        <Field label="Photo de profil (facultative)" error={undefined}><label className="registration-photo-upload"><span className="registration-photo-preview" style={photoPreview ? { backgroundImage: `url(${photoPreview})` } : undefined}>{!photoPreview && <ImagePlus />}</span><span><strong>{photo ? photo.name : "Choisir une photo"}</strong><small>JPG, PNG ou WebP · 5 Mo maximum</small></span><input aria-label="Importer une photo de profil" type="file" accept="image/jpeg,image/png,image/webp" onChange={(event) => { const selected = event.target.files?.[0]; if (!selected) return; try { validateProfileImage(selected); setPhoto(selected); setPhotoPreview((current) => { if (current) URL.revokeObjectURL(current); return URL.createObjectURL(selected); }); setServerError(""); } catch (reason) { event.currentTarget.value = ""; setServerError(reason instanceof Error ? reason.message : "Photo invalide."); } }} /></label></Field>
         <div className="form-grid"><Field label="Mot de passe" error={errors.password?.message}><div className="input-shell"><LockKeyhole /><input type={showPassword ? "text" : "password"} autoComplete="new-password" placeholder="8 caractères minimum" {...register("password")} /><button type="button" onClick={() => setShowPassword(!showPassword)}>{showPassword ? <EyeOff /> : <Eye />}</button></div></Field><Field label="Confirmation" error={errors.confirmPassword?.message}><div className="input-shell"><LockKeyhole /><input type={showPassword ? "text" : "password"} autoComplete="new-password" placeholder="Confirmez" {...register("confirmPassword")} /></div></Field></div>
         <div className="form-grid"><Field label={role === "club_admin" ? "Club demandé ou nom du club" : "Club demandé"} error={errors.clubId?.message}><div className="input-shell"><Building2 /><input placeholder={role === "athlete" ? "Facultatif" : "Requis"} {...register("clubId")} /></div></Field>{role !== "club_admin" && <Field label={role === "coach" ? "Numéro de licence" : "Numéro de licence (facultatif)"} error={errors.licenseNumber?.message}><div className="input-shell"><IdCard /><input placeholder={role === "coach" ? "Requis" : "Facultatif"} {...register("licenseNumber")} /></div></Field>}</div>
         {role === "athlete" && <Field label="Coach demandé (facultatif)" error={errors.coachId?.message}><div className="input-shell"><UserRound /><input placeholder="Identifiant ou e-mail du coach" {...register("coachId")} /></div></Field>}

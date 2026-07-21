@@ -14,6 +14,7 @@ export interface UserProfile {
   phone: string | null;
   profilePhotoUrl: string | null;
   birthDate: unknown | null;
+  trainingStartYear: number | null;
   specialty: string | null;
   category: string | null;
   level: string | null;

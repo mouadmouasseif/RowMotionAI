@@ -21,8 +21,8 @@ service firebase.storage {
     match /analyses/{ownerId}/{analysisId}/{fileName} {
       allow read: if active() && (request.auth.uid == ownerId || superAdmin());
       allow create: if active() && request.auth.uid == ownerId
-        && request.resource.size < 250 * 1024 * 1024
-        && request.resource.contentType.matches('video/(mp4|quicktime|webm)');
+        && request.resource.size < 500 * 1024 * 1024
+        && request.resource.contentType.matches('video/(mp4|quicktime|webm|x-msvideo)');
       allow update, delete: if active() && (request.auth.uid == ownerId || superAdmin());
     }
   }

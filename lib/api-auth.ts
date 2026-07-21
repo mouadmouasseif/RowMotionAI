@@ -1,0 +1,6 @@
+import "server-only";
+import { getAdminServices } from "@/lib/firebase/admin";
+import type { UserRole } from "@/types/user";
+export interface AuthenticatedUser { uid:string; role:UserRole; clubId:string|null }
+export async function requireApiUser(request:Request):Promise<AuthenticatedUser>{const value=request.headers.get("authorization");if(!value?.startsWith("Bearer "))throw new Error("AUTH_REQUIRED");const {auth,db}=getAdminServices();const token=await auth.verifyIdToken(value.slice(7));const profile=await db.doc(`users/${token.uid}`).get();if(!profile.exists||profile.data()?.active!==true)throw new Error("ACCOUNT_INACTIVE");return {uid:token.uid,role:profile.data()?.role as UserRole,clubId:profile.data()?.clubId??null};}
+export function apiError(reason:unknown){const code=reason instanceof Error?reason.message:"INTERNAL_ERROR";const status=code==="AUTH_REQUIRED"?401:code==="FORBIDDEN"?403:404;const messages:Record<string,string>={AUTH_REQUIRED:"Authentification requise.",ACCOUNT_INACTIVE:"Compte inactif.",FORBIDDEN:"Accès non autorisé.",NOT_FOUND:"Analyse introuvable."};return Response.json({success:false,error:{code,message:messages[code]??"Une erreur interne est survenue."}},{status});}

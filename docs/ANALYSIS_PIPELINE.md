@@ -1,0 +1,3 @@
+# Pipeline d’analyse
+
+Le client valide la taille, le MIME, la durée, la piste et la résolution, crée l’analyse, envoie la vidéo dans Storage, puis appelle la route Next.js avec son jeton Firebase. La route vérifie identité et droits, crée `analysisJobs/{analysisId}` transactionnellement et passe l’analyse à `queued`. Le worker revendique le job une seule fois, télécharge la vidéo dans un dossier temporaire, échantillonne jusqu’à 15 images/s, exécute MediaPipe, calcule les angles, publie l’avancement puis écrit les résultats. Une exception produit `failed` avec un code stable; une demande d’annulation est vérifiée pendant la boucle.
