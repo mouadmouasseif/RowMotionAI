@@ -1,0 +1,2 @@
+export type ConsoleSource="application"|"browser-extension"|"service-worker"|"unknown";
+export function classifyConsoleSource(sourceUrl?:string):ConsoleSource{if(!sourceUrl)return"unknown";if(sourceUrl.startsWith("chrome-extension://")||sourceUrl.startsWith("moz-extension://"))return"browser-extension";if(sourceUrl.includes("/sw.js")||sourceUrl.includes("/service-worker"))return"service-worker";if(typeof window!=="undefined"&&sourceUrl.includes(window.location.hostname))return"application";return"unknown";}

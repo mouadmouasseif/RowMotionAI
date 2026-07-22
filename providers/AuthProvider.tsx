@@ -25,27 +25,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (!auth || !db) { setLoading(false); return; }
     const currentAuth = auth;
     const currentDb = db;
-    return onAuthStateChanged(currentAuth, async (firebaseUser) => {
+    let disposed=false;const timers=new Set<ReturnType<typeof setTimeout>>();
+    const delay=(duration:number)=>new Promise<void>((resolve)=>{const timer=setTimeout(()=>{timers.delete(timer);resolve();},duration);timers.add(timer);});
+    const unsubscribe=onAuthStateChanged(currentAuth, async (firebaseUser) => {
+      if(disposed)return;
       setLoading(true);
       if (!firebaseUser) { setUser(null); setProfile(null); setLoading(false); return; }
       try {
         let snapshot = await getDoc(doc(currentDb, "users", firebaseUser.uid));
         // La création Authentication précède de quelques millisecondes l’écriture du profil.
         for (let attempt = 0; !snapshot.exists() && attempt < 4; attempt += 1) {
-          await new Promise((resolve) => setTimeout(resolve, 250));
+          await delay(250);if(disposed)return;
           snapshot = await getDoc(doc(currentDb, "users", firebaseUser.uid));
         }
         if (!snapshot.exists()) throw new Error("Profil absent");
         const loadedProfile = createUserProfile(firebaseUser.uid, firebaseUser.email, snapshot.data());
         if (!loadedProfile.active) throw new Error("Compte désactivé");
-        setUser(firebaseUser);
-        setProfile(loadedProfile);
+        if(!disposed){setUser(firebaseUser);setProfile(loadedProfile);}
       } catch {
         await signOut(currentAuth);
-        setUser(null);
-        setProfile(null);
-      } finally { setLoading(false); }
+        if(!disposed){setUser(null);setProfile(null);}
+      } finally { if(!disposed)setLoading(false); }
     });
+    return()=>{disposed=true;unsubscribe();timers.forEach(clearTimeout);timers.clear();};
   }, []);
 
   const value = useMemo<AuthContextValue>(() => ({

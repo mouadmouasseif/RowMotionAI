@@ -12,6 +12,7 @@ import { Brand } from "@/components/Brand";
 import { getAuthErrorMessage } from "@/lib/auth-errors";
 import { loginUser } from "@/services/auth-service";
 import { getDashboardPath, type UserRole } from "@/types/user";
+import { getSafeNextPath } from "@/lib/navigation/safe-next-path";
 
 const schema = z.object({
   email: z.string().email("Saisissez une adresse e-mail valide."),
@@ -37,7 +38,8 @@ function LoginContent() {
     setServerError("");
     try {
       const profile = await loginUser({ email: values.email, password: values.password, selectedRole: role, superAdminCode });
-      router.replace(getDashboardPath(profile.role));
+      const requestedPath=new URLSearchParams(window.location.search).get("next");
+      router.replace(getSafeNextPath(requestedPath,getDashboardPath(profile.role)));
       router.refresh();
     } catch (error) { setServerError(getAuthErrorMessage(error)); }
   }
