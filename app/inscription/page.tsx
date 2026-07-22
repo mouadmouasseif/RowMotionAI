@@ -52,7 +52,13 @@ export default function RegistrationPage() {
     setServerError("");
     try {
       const profile = await registerUser({ ...values, trainingStartYear: Number(values.trainingStartYear) });
-      if (photo) await uploadProfilePhoto(profile.uid, photo);
+      if (photo) {
+        try {
+          await uploadProfilePhoto(profile.uid, photo);
+        } catch (photoError) {
+          console.warn("[RowMotion] Optional profile photo upload failed:", photoError);
+        }
+      }
       if (profile.role === "athlete") router.replace("/athlete/dashboard");
       else router.replace(`/pending-approval?role=${profile.role}`);
       router.refresh();
