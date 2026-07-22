@@ -9,28 +9,26 @@ export interface LocalPoseAnalysisResult {
   recommendations: string[];
 }
 
-let landmarkerPromise: Promise<PoseLandmarker> | null = null;
+let visionPromise: ReturnType<typeof FilesetResolver.forVisionTasks> | null = null;
 
-function getLandmarker() {
-  if (!landmarkerPromise) {
-    landmarkerPromise = (async () => {
-      const vision = await FilesetResolver.forVisionTasks(
-        "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.35/wasm",
-      );
-      return PoseLandmarker.createFromOptions(vision, {
-        baseOptions: { modelAssetPath: "/models/pose_landmarker_lite.task", delegate: "CPU" },
-        runningMode: "VIDEO",
-        numPoses: 1,
-        minPoseDetectionConfidence: 0.5,
-        minPosePresenceConfidence: 0.5,
-        minTrackingConfidence: 0.5,
-      });
-    })().catch((error) => {
-      landmarkerPromise = null;
+async function createLandmarker() {
+  if (!visionPromise) {
+    visionPromise = FilesetResolver.forVisionTasks(
+      "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.35/wasm",
+    ).catch((error) => {
+      visionPromise = null;
       throw error;
     });
   }
-  return landmarkerPromise;
+  const vision = await visionPromise;
+  return PoseLandmarker.createFromOptions(vision, {
+    baseOptions: { modelAssetPath: "/models/pose_landmarker_lite.task", delegate: "CPU" },
+    runningMode: "VIDEO",
+    numPoses: 1,
+    minPoseDetectionConfidence: 0.5,
+    minPosePresenceConfidence: 0.5,
+    minTrackingConfidence: 0.5,
+  });
 }
 
 function angle(a: NormalizedLandmark, b: NormalizedLandmark, c: NormalizedLandmark) {
@@ -81,7 +79,7 @@ export async function analyzeLocalVideo(
   onProgress: (progress: number) => void,
 ): Promise<LocalPoseAnalysisResult> {
   if (typeof window === "undefined") throw new Error("L’analyse locale nécessite un navigateur.");
-  const landmarker = await getLandmarker();
+  const landmarker = await createLandmarker();
   const source = URL.createObjectURL(file);
   const video = document.createElement("video");
   video.muted = true;
@@ -180,6 +178,7 @@ export async function analyzeLocalVideo(
     if (!errors.length) recommendations.push("La posture détectée est régulière. Continuez à privilégier la fluidité du cycle.");
     return { metrics, technicalScore, processedFrames: totalFrames, errors, recommendations };
   } finally {
+    landmarker.close();
     video.removeAttribute("src");
     video.load();
     URL.revokeObjectURL(source);
