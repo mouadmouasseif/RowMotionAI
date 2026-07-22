@@ -9,6 +9,7 @@ import { AthleteSelector } from "@/components/AthleteSelector";
 import { useAuth } from "@/providers/AuthProvider";
 import { createAnalysis, queueAnalysis, updateAnalysis } from "@/services/analysis-service";
 import { saveLocalAnalysisVideo } from "@/services/local-video-service";
+import { analyzeLocalVideo } from "@/services/local-pose-analysis-service";
 import {
   inspectAnalysisVideo,
   isCloudVideoStorageEnabled,
@@ -58,6 +59,7 @@ function Content() {
 
     setBusy(true);
     setError("");
+    let createdAnalysisId = "";
     try {
       const metadata = await inspectAnalysisVideo(file);
       const id = await createAnalysis({
@@ -68,6 +70,7 @@ function Content() {
         profile,
         fileName: file.name,
       });
+      createdAnalysisId = id;
 
       if (isCloudVideoStorageEnabled) {
         const uploaded = await uploadAnalysisVideo(id, file, setProgress);
@@ -87,14 +90,38 @@ function Content() {
           storagePath: localPath,
           videoStorageMode: "local",
           durationSeconds: metadata.duration,
-          status: "uploaded",
-          progress: { status: "uploaded", progress: 100, currentStep: "upload", processedFrames: 0, totalFrames: 0 },
+          status: "processing",
+          progress: { status: "processing", progress: 0, currentStep: "pose_detection", processedFrames: 0, totalFrames: 0 },
+        });
+        setProgress(0);
+        const result = await analyzeLocalVideo(file, setProgress);
+        await updateAnalysis(id, {
+          status: "completed",
+          metrics: result.metrics,
+          technicalScore: result.technicalScore,
+          errors: result.errors,
+          recommendations: result.recommendations,
+          metricsSource: "biomechanics_engine",
+          progress: {
+            status: "completed",
+            progress: 100,
+            currentStep: "completed",
+            processedFrames: result.processedFrames,
+            totalFrames: result.processedFrames,
+          },
         });
       }
 
       router.replace(`/analyses/${id}`);
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Import impossible.");
+      const message = reason instanceof Error ? reason.message : "Import impossible.";
+      if (createdAnalysisId) {
+        void updateAnalysis(createdAnalysisId, {
+          status: "failed",
+          progress: { status: "failed", progress, currentStep: "pose_detection", processedFrames: 0, totalFrames: 0, errorMessage: message },
+        }).catch((updateError: unknown) => console.error("[RowMotion] Unable to save local analysis failure:", updateError));
+      }
+      setError(message);
       setBusy(false);
     }
   };
@@ -109,9 +136,9 @@ function Content() {
     </div></div>
     <div className="step-card"><span className="step-number">3</span><h2>Vidéo</h2>
       {file ? <div className="video-preview"><video aria-label="Aperçu vidéo" controls src={preview} /><div><strong>{file.name}</strong><small>{(file.size / 1048576).toFixed(1)} Mo</small><button disabled={busy} onClick={() => { URL.revokeObjectURL(preview); setFile(null); setPreview(""); }}><X />Retirer</button></div></div> : <label className="upload-zone"><Upload /><strong>Choisir une vidéo</strong><small>MP4, MOV, WebM ou AVI · {MAX_VIDEO_SIZE_MB} Mo maximum</small><input aria-label="Importer une vidéo" type="file" accept="video/mp4,video/quicktime,video/webm,video/x-msvideo" onChange={(event) => { const selected = event.target.files?.[0]; if (selected) void choose(selected); }} /></label>}
-      {busy && <div className="progress-track" aria-label="Progression de l’enregistrement"><span style={{ width: `${progress}%` }} /><small>{progress}% enregistré</small></div>}
+      {busy && <div className="progress-track" aria-label="Progression de l’analyse"><span style={{ width: `${progress}%` }} /><small>{progress}% analysé</small></div>}
       {error && <div className="error-card">{error}</div>}
-      <button className="button primary submit-analysis" disabled={busy || !file} onClick={() => void submit()}>{busy ? "Enregistrement en cours…" : isCloudVideoStorageEnabled ? "Envoyer et lancer l’analyse" : "Enregistrer la vidéo localement"}</button>
+      <button className="button primary submit-analysis" disabled={busy || !file} onClick={() => void submit()}>{busy ? "Analyse en cours…" : isCloudVideoStorageEnabled ? "Envoyer et lancer l’analyse" : "Analyser la vidéo localement"}</button>
     </div>
   </AppShell>;
 }
