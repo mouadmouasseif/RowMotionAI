@@ -12,7 +12,7 @@ export function Footer() {
           <Link href="/politique-de-confidentialite">Politique de confidentialité</Link>
           <Link href="/conditions-utilisation">Conditions d&apos;utilisation</Link>
         </nav>
-        <div className="footer-credit"><span>Développé par</span><Link href="https://mouadmouasseif.vercel.app/"><Image src="/made-for-web.png" alt="Mouad Mouasseif" width={42} height={42} /><strong>Mouad Mouasseif</strong></Link></div>
+        <div className="footer-credit"><span>Développé par</span><Link href="https://mouadmouasseif.vercel.app/"><Image src="/made-for-web.png" alt="Mouad Mouasseif" width={42} height={42} /></Link><strong>Mouad Mouasseif</strong></div>
       </div>
       <div className="footer-bottom">© 2026 RowMotion AI <span>|</span> Développé par Mouad Mouasseif. Tous droits réservés.</div>
       <a className="footer-chat" href="https://mouadmouasseif.vercel.app/" aria-label="Contacter RowMotion AI"><MessageCircle /></a>

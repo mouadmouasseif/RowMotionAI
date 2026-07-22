@@ -8,7 +8,6 @@ import { NetworkStatus } from "@/components/pwa/NetworkStatus";
 import { InstallBanner } from "@/components/pwa/InstallBanner";
 import { CookieConsent } from "@/components/CookieConsent";
 import { siteConfig } from "@/config/site";
-import { Footer } from "@/components/Footer";
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteConfig.url),
@@ -30,5 +29,5 @@ export const metadata: Metadata = {
 export const viewport: Viewport = { themeColor: "#0b5cff", width: "device-width", initialScale: 1, viewportFit: "cover" };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  return <html lang="fr" suppressHydrationWarning><body><PwaInstallProvider><AuthProvider><FirebaseAnalytics /><ServiceWorkerRegister /><NetworkStatus />{children}<CookieConsent /><InstallBanner /></AuthProvider></PwaInstallProvider><Footer /></body></html>;
+  return <html lang="fr" suppressHydrationWarning><body><PwaInstallProvider><AuthProvider><FirebaseAnalytics /><ServiceWorkerRegister /><NetworkStatus />{children}<CookieConsent /><InstallBanner /></AuthProvider></PwaInstallProvider></body></html>;
 }

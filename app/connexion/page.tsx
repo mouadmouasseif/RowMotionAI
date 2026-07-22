@@ -9,7 +9,7 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { Brand } from "@/components/Brand";
-import { getAuthErrorMessage } from "@/lib/auth-errors";
+import { getAuthErrorMessage, getFirebaseErrorCode } from "@/lib/auth-errors";
 import { loginUser } from "@/services/auth-service";
 import { getDashboardPath, type UserRole } from "@/types/user";
 import { getSafeNextPath } from "@/lib/navigation/safe-next-path";
@@ -41,7 +41,13 @@ function LoginContent() {
       const requestedPath=new URLSearchParams(window.location.search).get("next");
       router.replace(getSafeNextPath(requestedPath,getDashboardPath(profile.role)));
       router.refresh();
-    } catch (error) { setServerError(getAuthErrorMessage(error)); }
+    } catch (error) {
+      const firebaseCode = getFirebaseErrorCode(error);
+      if (firebaseCode && firebaseCode !== "auth/invalid-credential") {
+        console.error("[RowMotion] Firebase login failed:", firebaseCode);
+      }
+      setServerError(getAuthErrorMessage(error));
+    }
   }
 
   return (
