@@ -1,4 +1,4 @@
-import { addDoc, collection, doc, documentId, getDoc, getDocs, query, serverTimestamp, updateDoc, where, writeBatch } from "firebase/firestore/lite";
+import { addDoc, collection, doc, documentId, getDoc, getDocs, query, serverTimestamp, updateDoc, where, writeBatch } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
 import { createUserProfile } from "@/services/auth-service";
 import type { Club } from "@/types/club";

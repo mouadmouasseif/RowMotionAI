@@ -1,10 +1,121 @@
 "use client";
-import { useEffect,useState } from "react"; import { useRouter,useSearchParams } from "next/navigation"; import { Dumbbell,ShipWheel,Upload,X } from "lucide-react";
-import { AppShell } from "@/components/AppShell"; import { ProtectedPage } from "@/components/ProtectedPage"; import { AthleteSelector } from "@/components/AthleteSelector"; import { useAuth } from "@/providers/AuthProvider";
-import { createAnalysis,queueAnalysis,updateAnalysis } from "@/services/analysis-service"; import { inspectAnalysisVideo,isCloudVideoStorageEnabled,MAX_VIDEO_SIZE_MB,uploadAnalysisVideo } from "@/services/storage-service"; import type { AnalysisEnvironment } from "@/types/analysis"; import type { UserProfile } from "@/types/user";
-function Content(){const {profile}=useAuth();const router=useRouter();const params=useSearchParams();const [environment,setEnvironment]=useState<AnalysisEnvironment>(params.get("environment")==="ergometer"?"ergometer":"boat");const [athlete,setAthlete]=useState<UserProfile|null>(null);const [file,setFile]=useState<File|null>(null);const [preview,setPreview]=useState("");const [progress,setProgress]=useState(0);const [error,setError]=useState("");const [busy,setBusy]=useState(false);
-useEffect(()=>()=>{if(preview)URL.revokeObjectURL(preview);},[preview]);if(!profile)return null;
-const choose=async(selected:File)=>{try{await inspectAnalysisVideo(selected);setPreview(current=>{if(current)URL.revokeObjectURL(current);return URL.createObjectURL(selected);});setFile(selected);setError("");}catch(reason){setError(reason instanceof Error?reason.message:"Fichier invalide.");}};
-const submit=async()=>{if(!file||!athlete){setError("Sélectionnez un athlète et une vidéo.");return;}if(!isCloudVideoStorageEnabled){setError("Activez Firebase Storage pour effectuer une analyse biomécanique réelle.");return;}setBusy(true);setError("");try{const metadata=await inspectAnalysisVideo(file);const id=await createAnalysis({athleteId:athlete.uid,athleteName:`${athlete.firstName} ${athlete.lastName}`.trim(),environment,sourceType:"video",profile,fileName:file.name});const uploaded=await uploadAnalysisVideo(id,file,setProgress);await updateAnalysis(id,{videoUrl:uploaded.url,storagePath:uploaded.path,videoStorageMode:"firebase",durationSeconds:metadata.duration,status:"uploaded",progress:{status:"uploaded",progress:100,currentStep:"upload",processedFrames:0,totalFrames:0}});await queueAnalysis(id);router.replace(`/analyses/${id}`);}catch(reason){setError(reason instanceof Error?reason.message:"Import impossible.");setBusy(false);}};
-return <AppShell title="Nouvelle analyse" subtitle="Import vidéo biomécanique">{!isCloudVideoStorageEnabled&&<div className="error-card">Pipeline indisponible : activez Firebase Storage.</div>}<div className="step-card"><span className="step-number">1</span><h2>Athlète analysé</h2><AthleteSelector value={athlete} onChange={setAthlete} initialId={params.get("athleteId")}/></div><div className="step-card"><span className="step-number">2</span><h2>Discipline</h2><div className="choice-grid"><button className={environment==="boat"?"selected":""} onClick={()=>setEnvironment("boat")}><ShipWheel/>Bateau</button><button className={environment==="ergometer"?"selected":""} onClick={()=>setEnvironment("ergometer")}><Dumbbell/>Ergomètre</button><button className={environment==="beach_sprint"?"selected":""} onClick={()=>setEnvironment("beach_sprint")}><ShipWheel/>Beach Sprint</button></div></div><div className="step-card"><span className="step-number">3</span><h2>Vidéo</h2>{file?<div className="video-preview"><video aria-label="Aperçu vidéo" controls src={preview}/><div><strong>{file.name}</strong><small>{(file.size/1048576).toFixed(1)} Mo</small><button disabled={busy} onClick={()=>{URL.revokeObjectURL(preview);setFile(null);setPreview("");}}><X/>Retirer</button></div></div>:<label className="upload-zone"><Upload/><strong>Choisir une vidéo</strong><small>MP4, MOV, WebM ou AVI · {MAX_VIDEO_SIZE_MB} Mo maximum</small><input aria-label="Importer une vidéo" type="file" accept="video/mp4,video/quicktime,video/webm,video/x-msvideo" onChange={event=>{const selected=event.target.files?.[0];if(selected)void choose(selected);}}/></label>}{busy&&<div className="progress-track" aria-label="Progression de l’upload"><span style={{width:`${progress}%`}}/><small>{progress}% envoyé</small></div>}{error&&<div className="error-card">{error}</div>}<button className="button primary submit-analysis" disabled={busy||!file||!isCloudVideoStorageEnabled} onClick={()=>void submit()}>{busy?"Envoi en cours…":"Envoyer et lancer l’analyse"}</button></div></AppShell>}
-export default function Page(){return <ProtectedPage><Content/></ProtectedPage>}
+
+import { useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Dumbbell, ShipWheel, Upload, X } from "lucide-react";
+import { AppShell } from "@/components/AppShell";
+import { ProtectedPage } from "@/components/ProtectedPage";
+import { AthleteSelector } from "@/components/AthleteSelector";
+import { useAuth } from "@/providers/AuthProvider";
+import { createAnalysis, queueAnalysis, updateAnalysis } from "@/services/analysis-service";
+import { saveLocalAnalysisVideo } from "@/services/local-video-service";
+import {
+  inspectAnalysisVideo,
+  isCloudVideoStorageEnabled,
+  MAX_VIDEO_SIZE_MB,
+  uploadAnalysisVideo,
+} from "@/services/storage-service";
+import type { AnalysisEnvironment } from "@/types/analysis";
+import type { UserProfile } from "@/types/user";
+
+function Content() {
+  const { profile } = useAuth();
+  const router = useRouter();
+  const params = useSearchParams();
+  const [environment, setEnvironment] = useState<AnalysisEnvironment>(params.get("environment") === "ergometer" ? "ergometer" : "boat");
+  const [athlete, setAthlete] = useState<UserProfile | null>(null);
+  const [file, setFile] = useState<File | null>(null);
+  const [preview, setPreview] = useState("");
+  const [progress, setProgress] = useState(0);
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => () => {
+    if (preview) URL.revokeObjectURL(preview);
+  }, [preview]);
+
+  if (!profile) return null;
+
+  const choose = async (selected: File) => {
+    try {
+      await inspectAnalysisVideo(selected);
+      setPreview((current) => {
+        if (current) URL.revokeObjectURL(current);
+        return URL.createObjectURL(selected);
+      });
+      setFile(selected);
+      setError("");
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Fichier invalide.");
+    }
+  };
+
+  const submit = async () => {
+    if (!file || !athlete) {
+      setError("Sélectionnez un athlète et une vidéo.");
+      return;
+    }
+
+    setBusy(true);
+    setError("");
+    try {
+      const metadata = await inspectAnalysisVideo(file);
+      const id = await createAnalysis({
+        athleteId: athlete.uid,
+        athleteName: `${athlete.firstName} ${athlete.lastName}`.trim(),
+        environment,
+        sourceType: "video",
+        profile,
+        fileName: file.name,
+      });
+
+      if (isCloudVideoStorageEnabled) {
+        const uploaded = await uploadAnalysisVideo(id, file, setProgress);
+        await updateAnalysis(id, {
+          videoUrl: uploaded.url,
+          storagePath: uploaded.path,
+          videoStorageMode: "firebase",
+          durationSeconds: metadata.duration,
+          status: "uploaded",
+          progress: { status: "uploaded", progress: 100, currentStep: "upload", processedFrames: 0, totalFrames: 0 },
+        });
+        await queueAnalysis(id);
+      } else {
+        const localPath = await saveLocalAnalysisVideo(id, file, setProgress);
+        await updateAnalysis(id, {
+          videoUrl: null,
+          storagePath: localPath,
+          videoStorageMode: "local",
+          durationSeconds: metadata.duration,
+          status: "uploaded",
+          progress: { status: "uploaded", progress: 100, currentStep: "upload", processedFrames: 0, totalFrames: 0 },
+        });
+      }
+
+      router.replace(`/analyses/${id}`);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Import impossible.");
+      setBusy(false);
+    }
+  };
+
+  return <AppShell title="Nouvelle analyse" subtitle="Import vidéo biomécanique">
+    {!isCloudVideoStorageEnabled && <div className="notice-card">La vidéo restera stockée localement dans ce navigateur. Elle ne sera pas envoyée vers Firebase.</div>}
+    <div className="step-card"><span className="step-number">1</span><h2>Athlète analysé</h2><AthleteSelector value={athlete} onChange={setAthlete} initialId={params.get("athleteId")} /></div>
+    <div className="step-card"><span className="step-number">2</span><h2>Discipline</h2><div className="choice-grid">
+      <button className={environment === "boat" ? "selected" : ""} onClick={() => setEnvironment("boat")}><ShipWheel />Bateau</button>
+      <button className={environment === "ergometer" ? "selected" : ""} onClick={() => setEnvironment("ergometer")}><Dumbbell />Ergomètre</button>
+      <button className={environment === "beach_sprint" ? "selected" : ""} onClick={() => setEnvironment("beach_sprint")}><ShipWheel />Beach Sprint</button>
+    </div></div>
+    <div className="step-card"><span className="step-number">3</span><h2>Vidéo</h2>
+      {file ? <div className="video-preview"><video aria-label="Aperçu vidéo" controls src={preview} /><div><strong>{file.name}</strong><small>{(file.size / 1048576).toFixed(1)} Mo</small><button disabled={busy} onClick={() => { URL.revokeObjectURL(preview); setFile(null); setPreview(""); }}><X />Retirer</button></div></div> : <label className="upload-zone"><Upload /><strong>Choisir une vidéo</strong><small>MP4, MOV, WebM ou AVI · {MAX_VIDEO_SIZE_MB} Mo maximum</small><input aria-label="Importer une vidéo" type="file" accept="video/mp4,video/quicktime,video/webm,video/x-msvideo" onChange={(event) => { const selected = event.target.files?.[0]; if (selected) void choose(selected); }} /></label>}
+      {busy && <div className="progress-track" aria-label="Progression de l’enregistrement"><span style={{ width: `${progress}%` }} /><small>{progress}% enregistré</small></div>}
+      {error && <div className="error-card">{error}</div>}
+      <button className="button primary submit-analysis" disabled={busy || !file} onClick={() => void submit()}>{busy ? "Enregistrement en cours…" : isCloudVideoStorageEnabled ? "Envoyer et lancer l’analyse" : "Enregistrer la vidéo localement"}</button>
+    </div>
+  </AppShell>;
+}
+
+export default function Page() {
+  return <ProtectedPage><Content /></ProtectedPage>;
+}

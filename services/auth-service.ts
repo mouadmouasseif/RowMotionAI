@@ -1,5 +1,5 @@
 import { signInWithEmailAndPassword, signOut } from "firebase/auth";
-import { doc, getDoc } from "firebase/firestore/lite";
+import { doc, getDoc } from "firebase/firestore";
 import { auth, db, firebaseConfigurationError } from "@/lib/firebase";
 import { isUserRole, type UserProfile, type UserRole } from "@/types/user";
 

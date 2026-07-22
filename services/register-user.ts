@@ -1,5 +1,5 @@
 import { createUserWithEmailAndPassword, deleteUser, updateProfile } from "firebase/auth";
-import { doc, serverTimestamp, setDoc } from "firebase/firestore/lite";
+import { doc, serverTimestamp, setDoc } from "firebase/firestore";
 import { auth, db, firebaseConfigurationError, isFirebaseConfigured } from "@/lib/firebase";
 import type { PublicRegistrationRole, UserProfile } from "@/types/user";
 
