@@ -1,5 +1,16 @@
 export type PublicRegistrationRole = "athlete" | "coach" | "club_admin";
 export type UserRole = PublicRegistrationRole | "superadmin";
+export type ProfileDiscipline = "ERGOMETER" | "SKIFF" | "BEACH_ROWING";
+export type ProfileCategory = "U15" | "U19" | "U21" | "U23" | "SENIOR";
+export type ProfileGender = "male" | "female" | "other" | "not_specified";
+export interface ProfilePrivacySettings {
+  qrEnabled: boolean;
+  qrVisibility: "public" | "authenticated" | "club_only" | "coach_only";
+  showAge: boolean;
+  showGender: boolean;
+  showLicenseNumber: boolean;
+  showBestPerformances: boolean;
+}
 
 export interface UserProfile {
   uid: string;
@@ -21,6 +32,17 @@ export interface UserProfile {
   height: number | null;
   weight: number | null;
   legacyAge: number | null;
+  gender: ProfileGender;
+  disciplines: ProfileDiscipline[];
+  primaryDiscipline: ProfileDiscipline | null;
+  calculatedCategory: ProfileCategory | null;
+  officialCategory: ProfileCategory | null;
+  categoryOverrideReason: string | null;
+  nationality: string | null;
+  dominantSide: "left" | "right" | "ambidextrous" | null;
+  qrCodeId: string | null;
+  privacySettings: ProfilePrivacySettings;
+  sportStatus: "active" | "injured" | "inactive" | "archived";
   createdAt?: unknown;
   updatedAt?: unknown;
 }

@@ -25,12 +25,14 @@ const schema = z.object({
   password: z.string().min(8, "Le mot de passe doit contenir au moins 8 caractères.").regex(/[A-Z]/, "Ajoutez au moins une majuscule.").regex(/[a-z]/, "Ajoutez au moins une minuscule.").regex(/[0-9]/, "Ajoutez au moins un chiffre."),
   confirmPassword: z.string(),
   role: z.enum(["athlete", "coach", "club_admin"]),
+  disciplines: z.array(z.enum(["ERGOMETER", "SKIFF", "BEACH_ROWING"])).optional(),
   clubId: z.string().optional(),
   coachId: z.string().optional(),
   licenseNumber: z.string().optional(),
   termsAccepted: z.boolean().refine((value) => value, "Vous devez accepter les conditions."),
 }).superRefine((values, context) => {
   if (values.password !== values.confirmPassword) context.addIssue({ code: "custom", path: ["confirmPassword"], message: "Les mots de passe ne correspondent pas." });
+  if (values.role === "athlete" && !values.disciplines?.length) context.addIssue({ code: "custom", path: ["disciplines"], message: "Sélectionnez au moins une discipline." });
   if (values.role === "coach" && !values.licenseNumber?.trim()) context.addIssue({ code: "custom", path: ["licenseNumber"], message: "Le numéro de licence est requis pour un entraîneur." });
   if ((values.role === "coach" || values.role === "club_admin") && !values.clubId?.trim()) context.addIssue({ code: "custom", path: ["clubId"], message: "Indiquez le club demandé." });
 });
@@ -44,7 +46,7 @@ export default function RegistrationPage() {
   const [serverError, setServerError] = useState("");
   const [photo, setPhoto] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState("");
-  const { register, handleSubmit, watch, formState: { errors, isSubmitting } } = useForm<RegistrationValues>({ resolver: zodResolver(schema), defaultValues: { role: "athlete", termsAccepted: false } });
+  const { register, handleSubmit, watch, formState: { errors, isSubmitting } } = useForm<RegistrationValues>({ resolver: zodResolver(schema), defaultValues: { role: "athlete", disciplines: ["ERGOMETER"], termsAccepted: false } });
   const role = watch("role");
   useEffect(() => () => { if (photoPreview) URL.revokeObjectURL(photoPreview); }, [photoPreview]);
 
@@ -71,6 +73,7 @@ export default function RegistrationPage() {
       <div className="auth-heading"><span className="auth-icon"><UserRound /></span><h2>Créer votre compte</h2><p>Renseignez vos informations et choisissez votre profil.</p></div>
       <form onSubmit={handleSubmit(onSubmit)} noValidate>
         <div className="role-picker registration-roles">{roleOptions.map((option) => <label className={role === option.value ? "selected" : ""} key={option.value}><input type="radio" value={option.value} {...register("role")} /><span>{option.label}</span></label>)}</div>
+        {role === "athlete" && <Field label="Disciplines pratiquées" error={errors.disciplines?.message}><div className="choice-grid"><label><input type="checkbox" value="ERGOMETER" {...register("disciplines")} />Ergomètre</label><label><input type="checkbox" value="SKIFF" {...register("disciplines")} />Skiff</label><label><input type="checkbox" value="BEACH_ROWING" {...register("disciplines")} />Beach Rowing</label></div></Field>}
         <div className="form-grid"><Field label="Prénom" error={errors.firstName?.message}><div className="input-shell"><UserRound /><input placeholder="Mouad" {...register("firstName")} /></div></Field><Field label="Nom" error={errors.lastName?.message}><div className="input-shell"><UserRound /><input placeholder="Nom" {...register("lastName")} /></div></Field></div>
         <Field label="Adresse e-mail" error={errors.email?.message}><div className="input-shell"><Mail /><input type="email" autoComplete="email" placeholder="nom@club.fr" {...register("email")} /></div></Field>
         <Field label="Téléphone (facultatif)" error={errors.phone?.message}><div className="input-shell"><Phone /><input type="tel" placeholder="+212 6 00 00 00 00" {...register("phone")} /></div></Field>

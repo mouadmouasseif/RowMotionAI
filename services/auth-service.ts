@@ -1,7 +1,7 @@
 import { signInWithEmailAndPassword, signOut } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
 import { auth, db, firebaseConfigurationError } from "@/lib/firebase";
-import { isUserRole, type UserProfile, type UserRole } from "@/types/user";
+import { isUserRole, type ProfileCategory, type ProfileDiscipline, type ProfileGender, type UserProfile, type UserRole } from "@/types/user";
 
 interface LoginParams {
   email: string;
@@ -15,6 +15,12 @@ export function createUserProfile(uid: string, authEmail: string | null, data: R
   if (typeof data.uid === "string" && data.uid !== uid) {
     throw new Error("L’UID du profil Firestore ne correspond pas au compte Authentication.");
   }
+  const allowedDisciplines: ProfileDiscipline[] = ["ERGOMETER", "SKIFF", "BEACH_ROWING"];
+  const disciplines = Array.isArray(data.disciplines)
+    ? data.disciplines.filter((value): value is ProfileDiscipline => typeof value === "string" && allowedDisciplines.includes(value as ProfileDiscipline))
+    : [];
+  const privacy = typeof data.privacySettings === "object" && data.privacySettings !== null ? data.privacySettings as Record<string, unknown> : {};
+  const category = typeof data.category === "string" ? data.category : null;
   return {
     uid,
     email: typeof data.email === "string" ? data.email : authEmail ?? "",
@@ -35,6 +41,24 @@ export function createUserProfile(uid: string, authEmail: string | null, data: R
     height: typeof data.height === "number" ? data.height : null,
     weight: typeof data.weight === "number" ? data.weight : null,
     legacyAge: typeof data.age === "number" ? data.age : null,
+    gender: (["male", "female", "other", "not_specified"] as string[]).includes(String(data.gender)) ? data.gender as ProfileGender : "not_specified",
+    disciplines,
+    primaryDiscipline: typeof data.primaryDiscipline === "string" && allowedDisciplines.includes(data.primaryDiscipline as ProfileDiscipline) ? data.primaryDiscipline as ProfileDiscipline : disciplines[0] ?? null,
+    calculatedCategory: typeof data.calculatedCategory === "string" ? data.calculatedCategory as ProfileCategory : category as ProfileCategory | null,
+    officialCategory: typeof data.officialCategory === "string" ? data.officialCategory as ProfileCategory : category as ProfileCategory | null,
+    categoryOverrideReason: typeof data.categoryOverrideReason === "string" ? data.categoryOverrideReason : null,
+    nationality: typeof data.nationality === "string" ? data.nationality : null,
+    dominantSide: (["left", "right", "ambidextrous"] as string[]).includes(String(data.dominantSide)) ? data.dominantSide as "left" | "right" | "ambidextrous" : null,
+    qrCodeId: typeof data.qrCodeId === "string" ? data.qrCodeId : null,
+    privacySettings: {
+      qrEnabled: privacy.qrEnabled !== false,
+      qrVisibility: (["public", "authenticated", "club_only", "coach_only"] as string[]).includes(String(privacy.qrVisibility)) ? privacy.qrVisibility as UserProfile["privacySettings"]["qrVisibility"] : "authenticated",
+      showAge: privacy.showAge === true,
+      showGender: privacy.showGender === true,
+      showLicenseNumber: privacy.showLicenseNumber === true,
+      showBestPerformances: privacy.showBestPerformances !== false,
+    },
+    sportStatus: (["active", "injured", "inactive", "archived"] as string[]).includes(String(data.sportStatus)) ? data.sportStatus as UserProfile["sportStatus"] : "active",
     createdAt: data.createdAt,
     updatedAt: data.updatedAt,
   };

@@ -32,13 +32,57 @@ service cloud.firestore {
           && request.resource.data.role == resource.data.role
           && request.resource.data.uid == resource.data.uid
           && request.resource.data.email == resource.data.email
-          && request.resource.data.clubId == resource.data.clubId)
+            && request.resource.data.clubId == resource.data.clubId)
+        || (isCoach() && resource.data.role == "athlete" && resource.data.coachId == request.auth.uid
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            "officialCategory", "categoryOverrideReason", "categoryOverrideBy",
+            "disciplines", "primaryDiscipline", "sportStatus", "updatedAt"
+          ]))
         || (isOwnUser(userId)
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
             "firstName", "lastName", "phone", "profilePhotoUrl", "birthDate", "trainingStartYear",
-            "specialty", "category", "level", "height", "weight", "updatedAt"
+            "specialty", "category", "calculatedCategory", "level", "height", "weight", "gender",
+            "disciplines", "primaryDiscipline", "nationality", "dominantSide", "privacySettings",
+            "sportStatus", "qrCodeId", "updatedAt"
           ]));
       allow delete: if isSuperAdmin();
+    }
+
+    match /users/{userId}/personalBests/{performanceId} {
+      allow read: if isSignedIn() && (request.auth.uid == userId || isSuperAdmin()
+        || (isCoach() && get(/databases/$(database)/documents/users/$(userId)).data.coachId == request.auth.uid)
+        || (isClubAdmin() && sameClub(get(/databases/$(database)/documents/users/$(userId)).data.clubId)));
+      allow create: if isSignedIn() && (request.auth.uid == userId || isSuperAdmin()
+        || (isCoach() && get(/databases/$(database)/documents/users/$(userId)).data.coachId == request.auth.uid)
+        || (isClubAdmin() && sameClub(get(/databases/$(database)/documents/users/$(userId)).data.clubId)));
+      allow update, delete: if isSignedIn() && (request.auth.uid == userId || isSuperAdmin()
+        || (isCoach() && get(/databases/$(database)/documents/users/$(userId)).data.coachId == request.auth.uid)
+        || (isClubAdmin() && sameClub(get(/databases/$(database)/documents/users/$(userId)).data.clubId)));
+    }
+
+    match /qrProfiles/{qrCodeId} {
+      allow read: if resource.data.privacySettings.qrEnabled == true && (
+        resource.data.privacySettings.qrVisibility == "public"
+        || (request.auth != null && resource.data.privacySettings.qrVisibility == "authenticated")
+        || (request.auth != null && resource.data.privacySettings.qrVisibility == "coach_only" && resource.data.coachId == request.auth.uid)
+        || (request.auth != null && resource.data.privacySettings.qrVisibility == "club_only" && currentProfile().clubId == resource.data.clubId)
+        || (request.auth != null && request.auth.uid == resource.data.athleteId)
+      );
+      allow create, update: if request.auth != null && request.auth.uid == request.resource.data.athleteId;
+      allow delete: if request.auth != null && request.auth.uid == resource.data.athleteId;
+    }
+
+    match /competitions/{competitionId} {
+      allow read: if isActive();
+      allow create: if isActive() && (isCoach() || isClubAdmin() || isSuperAdmin());
+      allow update, delete: if isSuperAdmin() || (isClubAdmin() && sameClub(resource.data.clubId))
+        || (isCoach() && resource.data.createdBy == request.auth.uid);
+    }
+
+    match /athleteQrScans/{scanId} {
+      allow create: if isSignedIn() && request.resource.data.authenticatedUserId == request.auth.uid;
+      allow read: if isSuperAdmin() || (isSignedIn() && request.auth.uid == resource.data.athleteId);
+      allow update, delete: if false;
     }
 
     match /clubs/{clubId} {

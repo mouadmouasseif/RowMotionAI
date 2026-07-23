@@ -1,7 +1,8 @@
 import { createUserWithEmailAndPassword, deleteUser, updateProfile } from "firebase/auth";
 import { doc, serverTimestamp, setDoc } from "firebase/firestore";
 import { auth, db, firebaseConfigurationError, isFirebaseConfigured } from "@/lib/firebase";
-import type { PublicRegistrationRole, UserProfile } from "@/types/user";
+import { getAthleteCategory } from "@/lib/athlete-category";
+import type { ProfileDiscipline, PublicRegistrationRole, UserProfile } from "@/types/user";
 
 export interface RegisterUserInput {
   email: string;
@@ -15,6 +16,7 @@ export interface RegisterUserInput {
   licenseNumber?: string;
   birthDate: string;
   trainingStartYear: number;
+  disciplines?: ProfileDiscipline[];
 }
 
 function getInitialActiveStatus(role: PublicRegistrationRole): boolean {
@@ -39,6 +41,7 @@ export async function registerUser(input: RegisterUserInput): Promise<UserProfil
 
   try {
     await updateProfile(credential.user, { displayName: `${firstName} ${lastName}`.trim() });
+    const calculatedCategory = input.role === "athlete" ? getAthleteCategory(new Date(input.birthDate), new Date().getUTCFullYear()) : null;
     const profile: UserProfile = {
       uid: credential.user.uid,
       email,
@@ -59,8 +62,26 @@ export async function registerUser(input: RegisterUserInput): Promise<UserProfil
       height: null,
       weight: null,
       legacyAge: null,
+      gender: "not_specified",
+      disciplines: input.role === "athlete" ? input.disciplines?.length ? input.disciplines : ["ERGOMETER"] : [],
+      primaryDiscipline: input.role === "athlete" ? input.disciplines?.[0] ?? "ERGOMETER" : null,
+      calculatedCategory,
+      officialCategory: calculatedCategory,
+      categoryOverrideReason: null,
+      nationality: null,
+      dominantSide: null,
+      qrCodeId: crypto.randomUUID(),
+      privacySettings: { qrEnabled: true, qrVisibility: "authenticated", showAge: false, showGender: false, showLicenseNumber: false, showBestPerformances: true },
+      sportStatus: "active",
     };
     await setDoc(doc(db, "users", credential.user.uid), { ...profile, createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
+    if (profile.qrCodeId) await setDoc(doc(db, "qrProfiles", profile.qrCodeId), {
+      athleteId: profile.uid, role: profile.role, firstName: profile.firstName, lastName: profile.lastName,
+      profilePhotoUrl: profile.profilePhotoUrl, birthDate: profile.birthDate, gender: profile.gender,
+      category: profile.officialCategory ?? profile.calculatedCategory, disciplines: profile.disciplines,
+      clubId: profile.clubId, coachId: profile.coachId, licenseNumber: profile.licenseNumber,
+      sportStatus: profile.sportStatus, privacySettings: profile.privacySettings, updatedAt: serverTimestamp(),
+    });
     return profile;
   } catch (error) {
     try { await deleteUser(credential.user); } catch { /* L’erreur Firestore initiale reste prioritaire. */ }
