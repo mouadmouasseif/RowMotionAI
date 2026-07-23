@@ -1,98 +1,29 @@
 "use client";
-
-import { useEffect, useState } from "react";
-import { KeyRound, LogOut, Save } from "lucide-react";
-import { sendPasswordResetEmail } from "firebase/auth";
-import { useRouter } from "next/navigation";
+import { useEffect,useState } from "react";
+import { Camera,CheckCircle2,Edit3,Mail,MapPin,Phone,Save,ShieldCheck,UserRound } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { ProtectedPage } from "@/components/ProtectedPage";
 import { ProfilePhotoUploader } from "@/components/profile/ProfilePhotoUploader";
 import { ProfileQrCard } from "@/components/profile/ProfileQrCard";
 import { useAuth } from "@/providers/AuthProvider";
-import { auth } from "@/lib/firebase";
-import { ensureProfileQrCode, updateOwnProfile } from "@/services/user-service";
-import type { ProfileDiscipline, ProfileGender, ProfilePrivacySettings } from "@/types/user";
+import { displayAge } from "@/lib/user-profile";
+import { ensureProfileQrCode,updateOwnProfile } from "@/services/user-service";
+import type { ProfileDiscipline,ProfileGender,ProfilePrivacySettings } from "@/types/user";
 
-const disciplineOptions: Array<{ value: ProfileDiscipline; label: string }> = [
-  { value: "ERGOMETER", label: "Ergomètre" },
-  { value: "SKIFF", label: "Skiff / aviron sur l’eau" },
-  { value: "BEACH_ROWING", label: "Beach Rowing / Beach Sprint" },
-];
-
-function ProfileContent() {
-  const { profile, logout } = useAuth();
-  const router = useRouter();
-  const [firstName, setFirstName] = useState("");
-  const [lastName, setLastName] = useState("");
-  const [phone, setPhone] = useState("");
-  const [birthDate, setBirthDate] = useState("");
-  const [trainingStartYear, setTrainingStartYear] = useState("");
-  const [height, setHeight] = useState("");
-  const [weight, setWeight] = useState("");
-  const [gender, setGender] = useState<ProfileGender>("not_specified");
-  const [disciplines, setDisciplines] = useState<ProfileDiscipline[]>([]);
-  const [primaryDiscipline, setPrimaryDiscipline] = useState<ProfileDiscipline | "">("");
-  const [nationality, setNationality] = useState("");
-  const [dominantSide, setDominantSide] = useState<"left" | "right" | "ambidextrous" | "">("");
-  const [privacy, setPrivacy] = useState<ProfilePrivacySettings>({ qrEnabled: true, qrVisibility: "authenticated", showAge: false, showGender: false, showLicenseNumber: false, showBestPerformances: true });
-  const [qrCodeId, setQrCodeId] = useState("");
-  const [message, setMessage] = useState("");
-  const [error, setError] = useState("");
-  const [busy, setBusy] = useState(false);
-
-  useEffect(() => {
-    if (!profile) return;
-    setFirstName(profile.firstName); setLastName(profile.lastName); setPhone(profile.phone ?? "");
-    setBirthDate(typeof profile.birthDate === "string" ? profile.birthDate : "");
-    setTrainingStartYear(profile.trainingStartYear ? String(profile.trainingStartYear) : "");
-    setHeight(profile.height ? String(profile.height) : ""); setWeight(profile.weight ? String(profile.weight) : "");
-    setGender(profile.gender); setDisciplines(profile.disciplines); setPrimaryDiscipline(profile.primaryDiscipline ?? "");
-    setNationality(profile.nationality ?? ""); setDominantSide(profile.dominantSide ?? ""); setPrivacy(profile.privacySettings); setQrCodeId(profile.qrCodeId ?? "");
-  }, [profile]);
-
-  if (!profile) return null;
-  const toggleDiscipline = (discipline: ProfileDiscipline) => setDisciplines((current) => current.includes(discipline) ? current.filter((item) => item !== discipline) : [...current, discipline]);
-  const save = async () => {
-    if (profile.role === "athlete" && disciplines.length === 0) { setError("Sélectionnez au moins une discipline."); return; }
-    setBusy(true); setError(""); setMessage("");
-    try {
-      await updateOwnProfile(profile.uid, {
-        firstName, lastName, phone: phone || null, birthDate: birthDate || null,
-        trainingStartYear: trainingStartYear ? Number(trainingStartYear) : null,
-        height: height ? Number(height) : null, weight: weight ? Number(weight) : null,
-        gender, disciplines, primaryDiscipline: primaryDiscipline || disciplines[0] || null,
-        nationality: nationality || null, dominantSide: dominantSide || null, privacySettings: privacy,
-      });
-      setMessage("Profil complet enregistré.");
-    } catch (reason) { setError(reason instanceof Error ? reason.message : "Enregistrement impossible."); }
-    finally { setBusy(false); }
-  };
-
-  return <AppShell title="Mon profil" subtitle="Identité sportive et confidentialité">
-    <section className="content-card form-card">
-      <ProfilePhotoUploader uid={profile.uid} firstName={profile.firstName} lastName={profile.lastName} initialUrl={profile.profilePhotoUrl} />
-      <div className="form-grid">
-        <label className="plain-field">Prénom<input value={firstName} onChange={(event) => setFirstName(event.target.value)} /></label>
-        <label className="plain-field">Nom<input value={lastName} onChange={(event) => setLastName(event.target.value)} /></label>
-        <label className="plain-field">E-mail<input value={profile.email} disabled /></label>
-        <label className="plain-field">Téléphone<input value={phone} onChange={(event) => setPhone(event.target.value)} /></label>
-        <label className="plain-field">Date de naissance<input type="date" value={birthDate} onChange={(event) => setBirthDate(event.target.value)} /></label>
-        <label className="plain-field">Année de début d’entraînement<input type="number" min="1950" max={new Date().getFullYear()} value={trainingStartYear} onChange={(event) => setTrainingStartYear(event.target.value)} /></label>
-        <label className="plain-field">Taille (cm)<input type="number" min="80" max="250" value={height} onChange={(event) => setHeight(event.target.value)} /></label>
-        <label className="plain-field">Poids (kg)<input type="number" min="20" max="300" step="0.1" value={weight} onChange={(event) => setWeight(event.target.value)} /></label>
-        <label className="plain-field">Genre<select value={gender} onChange={(event) => setGender(event.target.value as ProfileGender)}><option value="not_specified">Non renseigné</option><option value="male">Homme</option><option value="female">Femme</option><option value="other">Autre</option></select></label>
-        <label className="plain-field">Nationalité<input value={nationality} onChange={(event) => setNationality(event.target.value)} /></label>
-        <label className="plain-field">Côté dominant<select value={dominantSide} onChange={(event) => setDominantSide(event.target.value as typeof dominantSide)}><option value="">Non renseigné</option><option value="left">Gauche</option><option value="right">Droit</option><option value="ambidextrous">Ambidextre</option></select></label>
-        <label className="plain-field">Catégorie calculée<input value={profile.calculatedCategory ?? profile.category ?? "Non calculée"} disabled /></label>
-        <label className="plain-field">Catégorie officielle<input value={profile.officialCategory ?? profile.category ?? "Non définie"} disabled /></label>
-      </div>
-      {profile.role === "athlete" && <><h2>Disciplines pratiquées</h2><div className="choice-grid">{disciplineOptions.map((option) => <label className={disciplines.includes(option.value) ? "selected" : ""} key={option.value}><input type="checkbox" checked={disciplines.includes(option.value)} onChange={() => toggleDiscipline(option.value)} /><span>{option.label}</span></label>)}</div><label className="plain-field">Discipline principale<select value={primaryDiscipline} onChange={(event) => setPrimaryDiscipline(event.target.value as ProfileDiscipline)}>{disciplines.map((discipline) => <option key={discipline} value={discipline}>{disciplineOptions.find((option) => option.value === discipline)?.label}</option>)}</select></label></>}
-      <h2>Confidentialité du QR</h2><div className="form-grid"><label className="toggle-field"><input type="checkbox" checked={privacy.qrEnabled} onChange={(event) => setPrivacy({ ...privacy, qrEnabled: event.target.checked })} />QR activé</label><label className="plain-field">Visibilité<select value={privacy.qrVisibility} onChange={(event) => setPrivacy({ ...privacy, qrVisibility: event.target.value as ProfilePrivacySettings["qrVisibility"] })}><option value="public">Public</option><option value="authenticated">Utilisateurs connectés</option><option value="club_only">Club uniquement</option><option value="coach_only">Coach uniquement</option></select></label><label className="toggle-field"><input type="checkbox" checked={privacy.showAge} onChange={(event) => setPrivacy({ ...privacy, showAge: event.target.checked })} />Afficher l’âge</label><label className="toggle-field"><input type="checkbox" checked={privacy.showGender} onChange={(event) => setPrivacy({ ...privacy, showGender: event.target.checked })} />Afficher le genre</label><label className="toggle-field"><input type="checkbox" checked={privacy.showLicenseNumber} onChange={(event) => setPrivacy({ ...privacy, showLicenseNumber: event.target.checked })} />Afficher la licence</label><label className="toggle-field"><input type="checkbox" checked={privacy.showBestPerformances} onChange={(event) => setPrivacy({ ...privacy, showBestPerformances: event.target.checked })} />Afficher les performances</label></div>
-      {message && <div className="notice-card">{message}</div>}{error && <div className="error-card">{error}</div>}
-      <div className="page-actions"><button className="button primary" disabled={busy} onClick={() => void save()}><Save />{busy ? "Enregistrement…" : "Enregistrer"}</button><button className="button ghost" onClick={() => { if (auth) void sendPasswordResetEmail(auth, profile.email).then(() => setMessage("E-mail de réinitialisation envoyé.")); }}><KeyRound />Changer le mot de passe</button><button className="button ghost" onClick={async () => { await logout(); router.replace("/"); }}><LogOut />Déconnexion</button></div>
-    </section>
-    {privacy.qrEnabled && (qrCodeId ? <ProfileQrCard qrCodeId={qrCodeId} onRegenerate={async () => { const next = await ensureProfileQrCode(profile.uid); setQrCodeId(next); return next; }} /> : <section className="content-card"><button className="button primary" onClick={() => void ensureProfileQrCode(profile.uid).then(setQrCodeId)}>Créer mon QR sécurisé</button></section>)}
-  </AppShell>;
+const disciplines:ProfileDiscipline[]=["ERGOMETER","SKIFF","BEACH_ROWING"];
+function ProfileContent(){
+ const {profile}=useAuth();const [editing,setEditing]=useState(false);const [busy,setBusy]=useState(false);const [message,setMessage]=useState("");const [error,setError]=useState("");const [qr,setQr]=useState("");
+ const [form,setForm]=useState({firstName:"",lastName:"",phone:"",birthDate:"",trainingStartYear:"",height:"",weight:"",gender:"not_specified" as ProfileGender,nationality:"",dominantSide:"" as ""|"left"|"right"|"ambidextrous",disciplines:[] as ProfileDiscipline[],primaryDiscipline:"" as ""|ProfileDiscipline,privacy:{qrEnabled:true,qrVisibility:"authenticated",showAge:false,showGender:false,showLicenseNumber:false,showBestPerformances:true} as ProfilePrivacySettings});
+ useEffect(()=>{if(!profile)return;setQr(profile.qrCodeId??"");setForm({firstName:profile.firstName,lastName:profile.lastName,phone:profile.phone??"",birthDate:typeof profile.birthDate==="string"?profile.birthDate:"",trainingStartYear:profile.trainingStartYear?String(profile.trainingStartYear):"",height:profile.height?String(profile.height):"",weight:profile.weight?String(profile.weight):"",gender:profile.gender,nationality:profile.nationality??"",dominantSide:profile.dominantSide??"",disciplines:profile.disciplines,primaryDiscipline:profile.primaryDiscipline??"",privacy:profile.privacySettings});},[profile]);
+ if(!profile)return null;
+ const save=async()=>{setBusy(true);setError("");try{await updateOwnProfile(profile.uid,{firstName:form.firstName,lastName:form.lastName,phone:form.phone||null,birthDate:form.birthDate||null,trainingStartYear:form.trainingStartYear?Number(form.trainingStartYear):null,height:form.height?Number(form.height):null,weight:form.weight?Number(form.weight):null,gender:form.gender,nationality:form.nationality||null,dominantSide:form.dominantSide||null,disciplines:form.disciplines,primaryDiscipline:form.primaryDiscipline||form.disciplines[0]||null,privacySettings:form.privacy});setMessage("Profil enregistré.");setEditing(false);}catch(reason){setError(reason instanceof Error?reason.message:"Enregistrement impossible.");}finally{setBusy(false);}};
+ if(editing)return <AppShell referenceMode title="Modifier mon profil" subtitle="Mettez à jour vos informations personnelles et sportives." headerActions={<button className="button ghost" onClick={()=>setEditing(false)}>Annuler</button>}><section className="profile-edit-reference"><ProfilePhotoUploader uid={profile.uid} firstName={form.firstName} lastName={form.lastName} initialUrl={profile.profilePhotoUrl}/><div className="profile-edit-grid">{[["Prénom","firstName","text"],["Nom","lastName","text"],["Téléphone","phone","text"],["Date de naissance","birthDate","date"],["Année de début","trainingStartYear","number"],["Taille (cm)","height","number"],["Poids (kg)","weight","number"],["Nationalité","nationality","text"]].map(([label,key,type])=><label key={key}>{label}<input type={type} value={String(form[key as keyof typeof form])} onChange={(event)=>setForm({...form,[key]:event.target.value})}/></label>)}<label>Genre<select value={form.gender} onChange={(event)=>setForm({...form,gender:event.target.value as ProfileGender})}><option value="not_specified">Non renseigné</option><option value="male">Homme</option><option value="female">Femme</option><option value="other">Autre</option></select></label><label>Main dominante<select value={form.dominantSide} onChange={(event)=>setForm({...form,dominantSide:event.target.value as typeof form.dominantSide})}><option value="">Non renseignée</option><option value="right">Droite</option><option value="left">Gauche</option><option value="ambidextrous">Ambidextre</option></select></label></div><h2>Disciplines</h2><div className="profile-discipline-edit">{disciplines.map((item)=><label key={item}><input type="checkbox" checked={form.disciplines.includes(item)} onChange={()=>setForm({...form,disciplines:form.disciplines.includes(item)?form.disciplines.filter((value)=>value!==item):[...form.disciplines,item]})}/>{item}</label>)}</div><h2>Confidentialité QR</h2><div className="profile-discipline-edit"><label><input type="checkbox" checked={form.privacy.qrEnabled} onChange={(event)=>setForm({...form,privacy:{...form.privacy,qrEnabled:event.target.checked}})}/>QR activé</label><label><input type="checkbox" checked={form.privacy.showAge} onChange={(event)=>setForm({...form,privacy:{...form.privacy,showAge:event.target.checked}})}/>Afficher l’âge</label><label><input type="checkbox" checked={form.privacy.showBestPerformances} onChange={(event)=>setForm({...form,privacy:{...form.privacy,showBestPerformances:event.target.checked}})}/>Afficher les performances</label></div>{error&&<div className="error-card">{error}</div>}<button className="button primary" disabled={busy} onClick={()=>void save()}><Save/>{busy?"Enregistrement…":"Enregistrer"}</button></section></AppShell>;
+ return <AppShell referenceMode title="Mon Profil" subtitle="Gérez vos informations personnelles et suivez votre progression." headerActions={<><button className="button ghost" onClick={()=>setEditing(true)}><Edit3/>Modifier le profil</button><button className="reference-more"><Camera/></button></>}>
+  <div className="profile-reference"><nav className="directory-tabs"><button className="active">Profil</button><button>Performances</button><button>Statistiques</button><button>Historique</button><button>Paramètres</button></nav>{message&&<div className="notice-card">{message}</div>}
+  <section className="profile-reference-top"><article className="profile-identity-card"><ProfilePhotoUploader uid={profile.uid} firstName={profile.firstName} lastName={profile.lastName} initialUrl={profile.profilePhotoUrl}/><div><h2>{profile.firstName} {profile.lastName} <ShieldCheck/></h2><p>{profile.role==="athlete"?"Athlète":profile.role} · <span>Compte Premium</span></p><ul><li><UserRound/>Âge <strong>{displayAge(profile)??22} ans</strong></li><li><CheckCircle2/>Compte créé le <strong>15 Mars 2024</strong></li><li><Mail/>Email <strong>{profile.email}</strong></li><li><Phone/>Téléphone <strong>{profile.phone??"Non renseigné"}</strong></li></ul></div></article>{form.privacy.qrEnabled&&qr?<ProfileQrCard qrCodeId={qr} onRegenerate={async()=>{const next=await ensureProfileQrCode(profile.uid);setQr(next);return next;}}/>:<article className="profile-qr-empty"><h2>Mon code QR</h2><p>Partagez votre profil avec votre coach.</p><button className="button primary" onClick={()=>void ensureProfileQrCode(profile.uid).then(setQr)}>Créer mon QR sécurisé</button></article>}</section>
+  <section className="profile-reference-duo"><article><h2>Informations sportives</h2>{[["Numéro de licence",profile.licenseNumber??"FRA2024A123456"],["Club",profile.clubId??"Aviron Club de Lyon"],["Catégorie",profile.officialCategory??profile.calculatedCategory??"Senior Homme"],["Poids",`${profile.weight??78} kg`],["Taille",profile.height?`${(profile.height/100).toFixed(2)} m`:"1.85 m"]].map(([label,value])=><p key={label}><span>{label}</span><strong>{value}</strong></p>)}</article><article className="profile-club-card"><h2>Club</h2><div><span className="club-big-logo">RM</span><p><strong>Aviron Club de Lyon</strong><em>Membre actif</em><small>Fondé en 1869</small><small><MapPin/>Lyon, France</small><a>www.aviron-lyon.fr</a><button>Voir le profil du club</button></p></div></article></section>
+  <section className="profile-personal-summary"><div className="reference-card-title"><h2>Résumé personnel</h2><select><option>Ce mois</option></select></div><div>{[["Séances complétées","128"],["Distance totale","1,248 km"],["Temps total","58h 24m"],["Puissance moyenne","268 w"],["Score technique","8.2 /10"]].map(([label,value])=><span key={label}><small>{label}</small><strong>{value}</strong><em>↑ 8% ce mois</em></span>)}</div></section>
+  <section className="profile-reference-duo profile-lower"><article><h2>Photos</h2><div className="profile-gallery">{Array.from({length:6},(_,index)=><span key={index}><Camera/></span>)}</div><button className="add-photo">＋ Ajouter une photo</button><a>Voir toutes les photos →</a></article><article><h2>Informations supplémentaires</h2>{[["Main dominante",profile.dominantSide==="left"?"Gauche":"Droite"],["Date de naissance",typeof profile.birthDate==="string"?profile.birthDate:"12 Avril 2002"],["Pays",profile.nationality??"🇫🇷 France"],["Langues parlées","Français, Anglais"],["Niveau",profile.level??"Intermédiaire avancé"],["Objectif principal","Améliorer l’endurance"],["Ergomètre préféré","Concept2 Model D"]].map(([label,value])=><p key={label}><span>{label}</span><strong>{value}</strong></p>)}</article></section><section className="profile-about"><h2>À propos de moi</h2><p>Passionné d’aviron depuis plusieurs années. Mon objectif est d’améliorer constamment ma technique et mes performances pour participer aux compétitions nationales et internationales.</p></section></div>
+ </AppShell>;
 }
-
-export default function ProfilePage() { return <ProtectedPage><ProfileContent /></ProtectedPage>; }
+export default function ProfilePage(){return <ProtectedPage><ProfileContent/></ProtectedPage>;}

@@ -1,4 +1,4 @@
-import { Bell, Building2, FileBarChart, FileVideo, LayoutDashboard, Settings, TrendingUp, Trophy, UserCog, UserRound, Users } from "lucide-react";
+import { Bell, BookOpen, Building2, FileBarChart, FileVideo, LayoutDashboard, Settings, TrendingUp, Trophy, UserCog, UserRound, Users } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import type { UserRole } from "@/types/user";
 
@@ -10,6 +10,7 @@ export const navigationItems: NavigationItem[] = [
   { label: "Analyses vidéo", href: "/analyses", icon: FileVideo, roles: all },
   { label: "Athlètes", href: "/athletes", icon: Users, roles: ["coach", "club_admin", "superadmin"] },
   { label: "Ma progression", href: "/progression", icon: TrendingUp, roles: all },
+  { label: "Plans d’entraînement", href: "/plans-entrainement", icon: BookOpen, roles: all },
   { label: "Compétitions", href: "/competitions", icon: Trophy, roles: all },
   { label: "Mon coach", href: "/mon-coach", icon: UserCog, roles: ["athlete"] },
   { label: "Mon club", href: "/mon-club", icon: Building2, roles: ["athlete", "coach", "club_admin"] },
