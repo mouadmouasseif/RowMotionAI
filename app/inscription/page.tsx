@@ -5,7 +5,7 @@ import { motion } from "framer-motion";
 import { Building2, CalendarDays, Eye, EyeOff, IdCard, ImagePlus, LockKeyhole, Mail, Phone, ShieldCheck, UserRound } from "lucide-react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { Brand } from "@/components/Brand";
@@ -46,11 +46,14 @@ export default function RegistrationPage() {
   const [serverError, setServerError] = useState("");
   const [photo, setPhoto] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState("");
+  const submitLockRef = useRef(false);
   const { register, handleSubmit, watch, formState: { errors, isSubmitting } } = useForm<RegistrationValues>({ resolver: zodResolver(schema), defaultValues: { role: "athlete", disciplines: ["ERGOMETER"], termsAccepted: false } });
   const role = watch("role");
   useEffect(() => () => { if (photoPreview) URL.revokeObjectURL(photoPreview); }, [photoPreview]);
 
   async function onSubmit(values: RegistrationValues) {
+    if (submitLockRef.current) return;
+    submitLockRef.current = true;
     setServerError("");
     try {
       const profile = await registerUser({ ...values, trainingStartYear: Number(values.trainingStartYear) });
@@ -64,7 +67,11 @@ export default function RegistrationPage() {
       if (profile.role === "athlete") router.replace("/athlete/dashboard");
       else router.replace(`/pending-approval?role=${profile.role}`);
       router.refresh();
-    } catch (error) { setServerError(getFirebaseRegistrationError(error)); }
+    } catch (error) {
+      setServerError(getFirebaseRegistrationError(error));
+    } finally {
+      submitLockRef.current = false;
+    }
   }
 
   return <main className="auth-page registration-page">

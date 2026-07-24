@@ -6,7 +6,7 @@ import { getStorage } from "firebase/storage";
 export function resolveStorageBucket(projectId?: string, configuredBucket?: string) {
   if (!projectId) return configuredBucket;
   const bucket = configuredBucket?.trim();
-  if (!bucket || (!bucket.startsWith(`${projectId}.`) && bucket !== `${projectId}.appspot.com`)) {
+  if (bucket !== `${projectId}.firebasestorage.app`) {
     return `${projectId}.firebasestorage.app`;
   }
   return bucket;
@@ -33,6 +33,9 @@ const requiredConfig = {
 };
 
 const missingVariables = Object.entries(requiredConfig).filter(([, value]) => !value).map(([key]) => key);
+if (missingVariables.length > 0 && typeof window !== "undefined" && process.env.NODE_ENV !== "test") {
+  console.error("[RowMotion] Variables Firebase manquantes :", missingVariables);
+}
 
 export const isFirebaseConfigured = missingVariables.length === 0;
 export const firebaseConfigurationError = missingVariables.length > 0

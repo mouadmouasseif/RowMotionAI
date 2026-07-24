@@ -1,35 +1,466 @@
 "use client";
-import { use,useCallback,useEffect,useState } from "react";
+import { use, useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft,BarChart3,Clock3,Edit3,FileVideo,Medal,Save,Trophy,Waves } from "lucide-react";
+import {
+  ArrowLeft,
+  BarChart3,
+  Clock3,
+  Edit3,
+  FileVideo,
+  Medal,
+  Save,
+  Trophy,
+  Waves,
+} from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { ProtectedPage } from "@/components/ProtectedPage";
-import { ProfileAvatar } from "@/components/profile/ProfileAvatar";
+import { ProfilePhotoUploader } from "@/components/profile/ProfilePhotoUploader";
 import { ProfileQrCard } from "@/components/profile/ProfileQrCard";
 import { useAuth } from "@/providers/AuthProvider";
 import { listAnalyses } from "@/services/analysis-service";
-import { listAthletes,listPersonalBests,updateManagedAthleteProfile } from "@/services/user-service";
+import {
+  listAthletes,
+  listPersonalBests,
+  updateManagedAthleteProfile,
+} from "@/services/user-service";
 import { displayAge } from "@/lib/user-profile";
 import type { RowingAnalysis } from "@/types/analysis";
 import type { AthleteBestPerformance } from "@/types/athlete";
-import type { ProfileCategory,ProfileDiscipline,UserProfile } from "@/types/user";
+import type {
+  ProfileCategory,
+  ProfileDiscipline,
+  UserProfile,
+} from "@/types/user";
 
-const disciplineLabels:Record<ProfileDiscipline,string>={ERGOMETER:"Ergomètre",SKIFF:"Skiff",BEACH_ROWING:"Beach Rowing"};
-const categories:ProfileCategory[]=["U15","U19","U21","U23","SENIOR"];
-function ScoreGraph(){const values=[6.3,6.8,7.1,7.6,7.9,8.2];const path=values.map((value,index)=>`${index?"L":"M"} ${25+index*95} ${175-(value-5)*42}`).join(" ");return <div className="athlete-score-chart"><svg viewBox="0 0 530 200"><path d={path}/>{values.map((value,index)=><g key={value}><circle cx={25+index*95} cy={175-(value-5)*42} r="4"/><text x={17+index*95} y={162-(value-5)*42}>{value}</text></g>)}</svg><div>{["Déc.","Janv.","Févr.","Mars","Avr.","Mai"].map((month)=><span key={month}>{month}</span>)}</div></div>}
-function AthleteProfile({id}:{id:string}){
- const {profile}=useAuth();const [athlete,setAthlete]=useState<UserProfile|null>(null);const [analyses,setAnalyses]=useState<RowingAnalysis[]>([]);const [bests,setBests]=useState<AthleteBestPerformance[]>([]);const [editing,setEditing]=useState(false);const [error,setError]=useState("");const [message,setMessage]=useState("");const [category,setCategory]=useState<ProfileCategory|"">("");const [status,setStatus]=useState<UserProfile["sportStatus"]>("active");const [selected,setSelected]=useState<ProfileDiscipline[]>([]);
- const reload=useCallback(async(manager:UserProfile)=>{const [users,rows,performances]=await Promise.all([listAthletes(manager),listAnalyses(manager),listPersonalBests(id)]);const found=users.find((item)=>item.uid===id)??null;setAthlete(found);setAnalyses(rows.filter((row)=>row.athleteId===id));setBests(performances);if(found){setCategory(found.officialCategory??"");setStatus(found.sportStatus);setSelected(found.disciplines);}},[id]);
- useEffect(()=>{if(profile)void reload(profile).catch(()=>setError("Profil athlète introuvable."));},[profile,reload]);if(!profile)return null;
- const save=async()=>{if(!athlete||!selected.length)return;try{await updateManagedAthleteProfile(profile,athlete.uid,{officialCategory:category||null,disciplines:selected,primaryDiscipline:selected[0],sportStatus:status});await reload(profile);setEditing(false);setMessage("Profil athlète mis à jour.");}catch(reason){setError(reason instanceof Error?reason.message:"Modification impossible.");}};
- const average=analyses.filter((row)=>row.technicalScore!==null).reduce((sum,row)=>sum+(row.technicalScore??0),0)/Math.max(analyses.filter((row)=>row.technicalScore!==null).length,1);
- return <AppShell referenceMode title="Profil de l’athlète" subtitle="" headerActions={<><Link className="button ghost" href="/athletes"><ArrowLeft/>Retour à la liste</Link>{editing?<button className="button primary" onClick={()=>void save()}><Save/>Enregistrer</button>:<button className="button primary" onClick={()=>setEditing(true)}><Edit3/>Modifier le profil</button>}</>}>
-  <div className="entity-profile athlete-profile-reference">{error&&<div className="error-card">{error}</div>}{message&&<div className="notice-card">{message}</div>}{!athlete?<div className="loading-card">Chargement…</div>:<>
-   <section className="athlete-profile-hero"><div className="athlete-photo-column"><ProfileAvatar photoUrl={athlete.profilePhotoUrl} firstName={athlete.firstName} lastName={athlete.lastName} large/>{athlete.qrCodeId&&athlete.privacySettings.qrEnabled&&<ProfileQrCard qrCodeId={athlete.qrCodeId}/>}</div><div>{editing?<div className="entity-edit-grid"><label>Catégorie<select value={category} onChange={(event)=>setCategory(event.target.value as ProfileCategory)}><option value="">Calculée</option>{categories.map((item)=><option key={item}>{item}</option>)}</select></label><label>Statut<select value={status} onChange={(event)=>setStatus(event.target.value as UserProfile["sportStatus"])}><option value="active">Actif</option><option value="injured">Blessé</option><option value="inactive">Inactif</option><option value="archived">Archivé</option></select></label><fieldset>{Object.entries(disciplineLabels).map(([value,label])=><label key={value}><input type="checkbox" checked={selected.includes(value as ProfileDiscipline)} onChange={()=>setSelected((current)=>current.includes(value as ProfileDiscipline)?current.filter((item)=>item!==value):[...current,value as ProfileDiscipline])}/>{label}</label>)}</fieldset></div>:<><h2>{athlete.firstName} {athlete.lastName} ✓</h2><p>Athlète · <em>Compte actif</em></p><ul><li>Âge <strong>{displayAge(athlete)??19} ans</strong></li><li>Genre <strong>{athlete.gender==="female"?"Femme":"Homme"}</strong></li><li>Email <strong>{athlete.email}</strong></li><li>Téléphone <strong>{athlete.phone??"+33 6 24 88 19 20"}</strong></li></ul><div className="athlete-body-stats"><span><small>Poids</small><strong>{athlete.weight??72} kg</strong></span><span><small>Taille</small><strong>{athlete.height?`${(athlete.height/100).toFixed(2)} m`:"1.83 m"}</strong></span><span><small>IMC</small><strong>21.5 <em>Normal</em></strong></span></div></>}</div><aside><h3>Club</h3><div className="club-big-logo">RM</div><p>Aviron Club de Lyon</p><p>Catégorie <strong>{athlete.officialCategory??athlete.calculatedCategory??"U19 Homme"}</strong></p><p>Numéro de licence <strong>{athlete.licenseNumber??"FRA2024A123458"}</strong></p><p>Nationalité <strong>🇫🇷 {athlete.nationality??"France"}</strong></p></aside></section>
-   <nav className="directory-tabs athlete-profile-tabs"><button className="active">Résumé</button><button>Performances</button><button>Analyses</button><button>Progression</button><button>Séances</button><button>Plans d’entraînement</button><button>Historique</button></nav>
-   <section className="entity-stats five">{([[FileVideo,"Analyses réalisées",analyses.length||24],[BarChart3,"Score technique moyen",average?`${(average/10).toFixed(1)}/10`:"8.2/10"],[Waves,"Distance totale analysée","356.8 km"],[Clock3,"Heures d’entraînement","78h 45m"],[Trophy,"Classement club","3/28"]] as const).map(([Icon,label,value])=><article key={String(label)}><Icon/><span><small>{label}</small><strong>{value}</strong><em>Toutes catégories</em></span></article>)}</section>
-   <div className="athlete-profile-grid"><section><h2>Informations personnelles</h2>{[["Date de naissance","04 Août 2005"],["Lieu de naissance","Lyon, France"],["Spécialités",athlete.disciplines.map((item)=>disciplineLabels[item]).join(", ")||"Skiff - 1x"],["Bras dominant",athlete.dominantSide==="left"?"Gaucher":"Droitier"],["Niveau",athlete.level??"Intermédiaire avancé"],["Scolarité / Études","Lycée Saint-Exupéry"],["Objectifs","Améliorer la puissance"]].map(([label,value])=><p key={label}><span>{label}</span><strong>{value}</strong></p>)}</section><section className="athlete-chart-card"><div className="reference-card-title"><h2>Évolution du score technique</h2><select><option>6 derniers mois</option></select></div><ScoreGraph/><em>↑ +0.5 points par rapport au mois dernier</em></section><section><div className="reference-card-title"><h2>Meilleures performances</h2><a>Voir tout</a></div>{(bests.length?bests.slice(0,5).map((item)=>[item.testOrEvent,`${item.value} ${item.unit}`]):[["Puissance max (Erg)","842 W"],["Vitesse max (Erg)","2:01 /500m"],["Distance max (Erg)","2000 m"],["Temps 2000m (Erg)","6:32.4"],["Cadence max (Erg)","38 spm"]]).map(([label,value])=><p key={String(label)}><Medal/><span>{label}</span><strong>{value}</strong></p>)}</section><section><div className="reference-card-title"><h2>Analyses récentes</h2><a>Voir tout</a></div>{(analyses.length?analyses.slice(0,4):Array.from({length:4},(_,index)=>({id:String(index),fileName:["Séance sur l’eau - Lac","Ergomètre - Test 2000m","Ergomètre - Endurance","Technique - Cadence"][index],technicalScore:[86,81,78,75][index]}))).map((row)=><Link className="athlete-analysis-row" key={row.id} href={analyses.length?`/analyses/${row.id}`:"#"}><Waves/><span><strong>{row.fileName}</strong><small>18 Mai 2024 · 6.2 km</small></span><em>{row.technicalScore?(row.technicalScore/10).toFixed(1):"8.0"}</em></Link>)}</section><section><h2>Statut actuel</h2>{[["Statut du compte",athlete.active?"Actif":"Inactif"],["Dernière connexion","19 Mai 2024 à 08:45"],["Depuis","12 Janv. 2024"],["Rôle","Athlète"],["Coach associé","Julien Lefebvre"],["Groupe","Groupe Performance"]].map(([label,value])=><p key={label}><span>{label}</span><strong>{value}</strong></p>)}</section></div>
-  </>}</div>
- </AppShell>;
+const disciplineLabels: Record<ProfileDiscipline, string> = {
+  ERGOMETER: "Ergomètre",
+  SKIFF: "Skiff",
+  BEACH_ROWING: "Beach Rowing",
+};
+const categories: ProfileCategory[] = ["U15", "U19", "U21", "U23", "SENIOR"];
+function ScoreGraph() {
+  const values = [6.3, 6.8, 7.1, 7.6, 7.9, 8.2];
+  const path = values
+    .map(
+      (value, index) =>
+        `${index ? "L" : "M"} ${25 + index * 95} ${175 - (value - 5) * 42}`,
+    )
+    .join(" ");
+  return (
+    <div className="athlete-score-chart">
+      <svg viewBox="0 0 530 200">
+        <path d={path} />
+        {values.map((value, index) => (
+          <g key={value}>
+            <circle cx={25 + index * 95} cy={175 - (value - 5) * 42} r="4" />
+            <text x={17 + index * 95} y={162 - (value - 5) * 42}>
+              {value}
+            </text>
+          </g>
+        ))}
+      </svg>
+      <div>
+        {["Déc.", "Janv.", "Févr.", "Mars", "Avr.", "Mai"].map((month) => (
+          <span key={month}>{month}</span>
+        ))}
+      </div>
+    </div>
+  );
 }
-export default function AthleteProfilePage({params}:{params:Promise<{athleteId:string}>}){const {athleteId}=use(params);return <ProtectedPage allowedRoles={["coach","club_admin","superadmin"]}><AthleteProfile id={athleteId}/></ProtectedPage>;}
+function AthleteProfile({ id }: { id: string }) {
+  const { profile } = useAuth();
+  const [athlete, setAthlete] = useState<UserProfile | null>(null);
+  const [analyses, setAnalyses] = useState<RowingAnalysis[]>([]);
+  const [bests, setBests] = useState<AthleteBestPerformance[]>([]);
+  const [editing, setEditing] = useState(false);
+  const [error, setError] = useState("");
+  const [message, setMessage] = useState("");
+  const [category, setCategory] = useState<ProfileCategory | "">("");
+  const [status, setStatus] = useState<UserProfile["sportStatus"]>("active");
+  const [selected, setSelected] = useState<ProfileDiscipline[]>([]);
+  const reload = useCallback(
+    async (manager: UserProfile) => {
+      const [users, rows, performances] = await Promise.all([
+        listAthletes(manager),
+        listAnalyses(manager),
+        listPersonalBests(id),
+      ]);
+      const found = users.find((item) => item.uid === id) ?? null;
+      setAthlete(found);
+      setAnalyses(rows.filter((row) => row.athleteId === id));
+      setBests(performances);
+      if (found) {
+        setCategory(found.officialCategory ?? "");
+        setStatus(found.sportStatus);
+        setSelected(found.disciplines);
+      }
+    },
+    [id],
+  );
+  useEffect(() => {
+    if (profile)
+      void reload(profile).catch(() => setError("Profil athlète introuvable."));
+  }, [profile, reload]);
+  if (!profile) return null;
+  const save = async () => {
+    if (!athlete || !selected.length) return;
+    try {
+      await updateManagedAthleteProfile(profile, athlete.uid, {
+        officialCategory: category || null,
+        disciplines: selected,
+        primaryDiscipline: selected[0],
+        sportStatus: status,
+      });
+      await reload(profile);
+      setEditing(false);
+      setMessage("Profil athlète mis à jour.");
+    } catch (reason) {
+      setError(
+        reason instanceof Error ? reason.message : "Modification impossible.",
+      );
+    }
+  };
+  const average =
+    analyses
+      .filter((row) => row.technicalScore !== null)
+      .reduce((sum, row) => sum + (row.technicalScore ?? 0), 0) /
+    Math.max(analyses.filter((row) => row.technicalScore !== null).length, 1);
+  return (
+    <AppShell
+      referenceMode
+      title="Profil de l’athlète"
+      subtitle=""
+      headerActions={
+        <>
+          <Link className="button ghost" href="/athletes">
+            <ArrowLeft />
+            Retour à la liste
+          </Link>
+          {editing ? (
+            <button className="button primary" onClick={() => void save()}>
+              <Save />
+              Enregistrer
+            </button>
+          ) : (
+            <button className="button primary" onClick={() => setEditing(true)}>
+              <Edit3 />
+              Modifier le profil
+            </button>
+          )}
+        </>
+      }
+    >
+      <div className="entity-profile athlete-profile-reference">
+        {error && <div className="error-card">{error}</div>}
+        {message && <div className="notice-card">{message}</div>}
+        {!athlete ? (
+          <div className="loading-card">Chargement…</div>
+        ) : (
+          <>
+            <section className="athlete-profile-hero">
+              <div className="athlete-photo-column">
+              <ProfilePhotoUploader
+                uid={athlete.uid}
+                firstName={athlete.firstName}
+                lastName={athlete.lastName}
+                initialUrl={athlete.profilePhotoUrl}
+                onChange={(profilePhotoUrl) => setAthlete({ ...athlete, profilePhotoUrl })}
+              />
+                {athlete.qrCodeId && athlete.privacySettings.qrEnabled && (
+                  <ProfileQrCard qrCodeId={athlete.qrCodeId} />
+                )}
+              </div>
+              <div>
+                {editing ? (
+                  <div className="entity-edit-grid">
+                    <label>
+                      Catégorie
+                      <select
+                        value={category}
+                        onChange={(event) =>
+                          setCategory(event.target.value as ProfileCategory)
+                        }
+                      >
+                        <option value="">Calculée</option>
+                        {categories.map((item) => (
+                          <option key={item}>{item}</option>
+                        ))}
+                      </select>
+                    </label>
+                    <label>
+                      Statut
+                      <select
+                        value={status}
+                        onChange={(event) =>
+                          setStatus(
+                            event.target.value as UserProfile["sportStatus"],
+                          )
+                        }
+                      >
+                        <option value="active">Actif</option>
+                        <option value="injured">Blessé</option>
+                        <option value="inactive">Inactif</option>
+                        <option value="archived">Archivé</option>
+                      </select>
+                    </label>
+                    <fieldset>
+                      {Object.entries(disciplineLabels).map(
+                        ([value, label]) => (
+                          <label key={value}>
+                            <input
+                              type="checkbox"
+                              checked={selected.includes(
+                                value as ProfileDiscipline,
+                              )}
+                              onChange={() =>
+                                setSelected((current) =>
+                                  current.includes(value as ProfileDiscipline)
+                                    ? current.filter((item) => item !== value)
+                                    : [...current, value as ProfileDiscipline],
+                                )
+                              }
+                            />
+                            {label}
+                          </label>
+                        ),
+                      )}
+                    </fieldset>
+                  </div>
+                ) : (
+                  <>
+                    <h2>
+                      {athlete.firstName} {athlete.lastName} ✓
+                    </h2>
+                    <p>
+                      Athlète · <em>Compte actif</em>
+                    </p>
+                    <ul>
+                      <li>
+                        Âge <strong>{displayAge(athlete) ?? 19} ans</strong>
+                      </li>
+                      <li>
+                        Genre{" "}
+                        <strong>
+                          {athlete.gender === "female" ? "Femme" : "Homme"}
+                        </strong>
+                      </li>
+                      <li>
+                        Email <strong>{athlete.email}</strong>
+                      </li>
+                      <li>
+                        Téléphone{" "}
+                        <strong>{athlete.phone ?? "+33 6 24 88 19 20"}</strong>
+                      </li>
+                    </ul>
+                    <div className="athlete-body-stats">
+                      <span>
+                        <small>Poids</small>
+                        <strong>{athlete.weight ?? 72} kg</strong>
+                      </span>
+                      <span>
+                        <small>Taille</small>
+                        <strong>
+                          {athlete.height
+                            ? `${(athlete.height / 100).toFixed(2)} m`
+                            : "1.83 m"}
+                        </strong>
+                      </span>
+                      <span>
+                        <small>IMC</small>
+                        <strong>
+                          21.5 <em>Normal</em>
+                        </strong>
+                      </span>
+                    </div>
+                  </>
+                )}
+              </div>
+              <aside>
+                <h3>Club</h3>
+                <div className="club-big-logo">RM</div>
+                <p>Aviron Club de Lyon</p>
+                <p>
+                  Catégorie{" "}
+                  <strong>
+                    {athlete.officialCategory ??
+                      athlete.calculatedCategory ??
+                      "U19 Homme"}
+                  </strong>
+                </p>
+                <p>
+                  Numéro de licence{" "}
+                  <strong>{athlete.licenseNumber ?? "FRA2024A123458"}</strong>
+                </p>
+                <p>
+                  Nationalité{" "}
+                  <strong>🇫🇷 {athlete.nationality ?? "France"}</strong>
+                </p>
+              </aside>
+            </section>
+            <nav className="directory-tabs athlete-profile-tabs">
+              <button className="active">Résumé</button>
+              <button>Performances</button>
+              <button>Analyses</button>
+              <button>Progression</button>
+              <button>Séances</button>
+              <button>Plans d’entraînement</button>
+              <button>Historique</button>
+            </nav>
+            <section className="entity-stats five">
+              {(
+                [
+                  [FileVideo, "Analyses réalisées", analyses.length || 24],
+                  [
+                    BarChart3,
+                    "Score technique moyen",
+                    average ? `${(average / 10).toFixed(1)}/10` : "8.2/10",
+                  ],
+                  [Waves, "Distance totale analysée", "356.8 km"],
+                  [Clock3, "Heures d’entraînement", "78h 45m"],
+                  [Trophy, "Classement club", "3/28"],
+                ] as const
+              ).map(([Icon, label, value]) => (
+                <article key={String(label)}>
+                  <Icon />
+                  <span>
+                    <small>{label}</small>
+                    <strong>{value}</strong>
+                    <em>Toutes catégories</em>
+                  </span>
+                </article>
+              ))}
+            </section>
+            <div className="athlete-profile-grid">
+              <section>
+                <h2>Informations personnelles</h2>
+                {[
+                  ["Date de naissance", "04 Août 2005"],
+                  ["Lieu de naissance", "Lyon, France"],
+                  [
+                    "Spécialités",
+                    athlete.disciplines
+                      .map((item) => disciplineLabels[item])
+                      .join(", ") || "Skiff - 1x",
+                  ],
+                  [
+                    "Bras dominant",
+                    athlete.dominantSide === "left" ? "Gaucher" : "Droitier",
+                  ],
+                  ["Niveau", athlete.level ?? "Intermédiaire avancé"],
+                  ["Scolarité / Études", "Lycée Saint-Exupéry"],
+                  ["Objectifs", "Améliorer la puissance"],
+                ].map(([label, value]) => (
+                  <p key={label}>
+                    <span>{label}</span>
+                    <strong>{value}</strong>
+                  </p>
+                ))}
+              </section>
+              <section className="athlete-chart-card">
+                <div className="reference-card-title">
+                  <h2>Évolution du score technique</h2>
+                  <select>
+                    <option>6 derniers mois</option>
+                  </select>
+                </div>
+                <ScoreGraph />
+                <em>↑ +0.5 points par rapport au mois dernier</em>
+              </section>
+              <section>
+                <div className="reference-card-title">
+                  <h2>Meilleures performances</h2>
+                  <a>Voir tout</a>
+                </div>
+                {(bests.length
+                  ? bests
+                      .slice(0, 5)
+                      .map((item) => [
+                        item.testOrEvent,
+                        `${item.value} ${item.unit}`,
+                      ])
+                  : [
+                      ["Puissance max (Erg)", "842 W"],
+                      ["Vitesse max (Erg)", "2:01 /500m"],
+                      ["Distance max (Erg)", "2000 m"],
+                      ["Temps 2000m (Erg)", "6:32.4"],
+                      ["Cadence max (Erg)", "38 spm"],
+                    ]
+                ).map(([label, value]) => (
+                  <p key={String(label)}>
+                    <Medal />
+                    <span>{label}</span>
+                    <strong>{value}</strong>
+                  </p>
+                ))}
+              </section>
+              <section>
+                <div className="reference-card-title">
+                  <h2>Analyses récentes</h2>
+                  <a>Voir tout</a>
+                </div>
+                {(analyses.length
+                  ? analyses.slice(0, 4)
+                  : Array.from({ length: 4 }, (_, index) => ({
+                      id: String(index),
+                      fileName: [
+                        "Séance sur l’eau - Lac",
+                        "Ergomètre - Test 2000m",
+                        "Ergomètre - Endurance",
+                        "Technique - Cadence",
+                      ][index],
+                      technicalScore: [86, 81, 78, 75][index],
+                    }))
+                ).map((row) => (
+                  <Link
+                    className="athlete-analysis-row"
+                    key={row.id}
+                    href={analyses.length ? `/analyses/${row.id}` : "#"}
+                  >
+                    <Waves />
+                    <span>
+                      <strong>{row.fileName}</strong>
+                      <small>18 Mai 2024 · 6.2 km</small>
+                    </span>
+                    <em>
+                      {row.technicalScore
+                        ? (row.technicalScore / 10).toFixed(1)
+                        : "8.0"}
+                    </em>
+                  </Link>
+                ))}
+              </section>
+              <section>
+                <h2>Statut actuel</h2>
+                {[
+                  ["Statut du compte", athlete.active ? "Actif" : "Inactif"],
+                  ["Dernière connexion", "19 Mai 2024 à 08:45"],
+                  ["Depuis", "12 Janv. 2024"],
+                  ["Rôle", "Athlète"],
+                  ["Coach associé", "Julien Lefebvre"],
+                  ["Groupe", "Groupe Performance"],
+                ].map(([label, value]) => (
+                  <p key={label}>
+                    <span>{label}</span>
+                    <strong>{value}</strong>
+                  </p>
+                ))}
+              </section>
+            </div>
+          </>
+        )}
+      </div>
+    </AppShell>
+  );
+}
+export default function AthleteProfilePage({
+  params,
+}: {
+  params: Promise<{ athleteId: string }>;
+}) {
+  const { athleteId } = use(params);
+  return (
+    <ProtectedPage allowedRoles={["coach", "club_admin", "superadmin"]}>
+      <AthleteProfile id={athleteId} />
+    </ProtectedPage>
+  );
+}

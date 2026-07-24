@@ -15,10 +15,24 @@ service firebase.storage {
         || (profile().role == "coach" && targetProfile(userId).role == "athlete" && targetProfile(userId).coachId == request.auth.uid)
       );
     }
-    function imageFile() { return request.resource.size < 5 * 1024 * 1024 && request.resource.contentType.matches('image/(jpeg|png|webp)'); }
+    function imageFile() {
+      return request.resource != null
+        && request.resource.size <= 5 * 1024 * 1024
+        && request.resource.contentType.matches('image/(jpeg|png|webp)');
+    }
+    function competition(competitionId) {
+      return firestore.get(/databases/(default)/documents/competitions/$(competitionId)).data;
+    }
+    function canManageCompetition(competitionId) {
+      return active() && (
+        superAdmin()
+        || competition(competitionId).createdBy == request.auth.uid
+        || (profile().role == "club_admin" && profile().clubId == competition(competitionId).clubId)
+      );
+    }
 
     match /profile-photos/{userId}/{fileName} {
-      allow read: if active();
+      allow read: if signedIn();
       allow create, update: if imageFile() && canManageProfile(userId);
       allow delete: if canManageProfile(userId);
     }
@@ -27,21 +41,21 @@ service firebase.storage {
       allow create, update: if imageFile() && (clubAdminFor(clubId) || superAdmin());
       allow delete: if clubAdminFor(clubId) || superAdmin();
     }
+    match /club-logos/{clubId}/{fileName} {
+      allow read: if true;
+      allow create, update: if imageFile() && (clubAdminFor(clubId) || superAdmin());
+      allow delete: if clubAdminFor(clubId) || superAdmin();
+    }
     match /competitions/{competitionId}/{fileName} {
       allow read: if true;
-      allow create, update: if imageFile() && active() && (
-        superAdmin() || profile().role == "club_admin" || profile().role == "coach"
-      );
-      allow delete: if active() && (
-        superAdmin() || profile().role == "club_admin" || profile().role == "coach"
-      );
+      allow create, update: if imageFile() && canManageCompetition(competitionId);
+      allow delete: if canManageCompetition(competitionId);
     }
     match /analyses/{ownerId}/{analysisId}/{fileName} {
       allow read: if active() && (request.auth.uid == ownerId || superAdmin());
-      allow create: if active() && request.auth.uid == ownerId
-        && request.resource.size < 500 * 1024 * 1024
-        && request.resource.contentType.matches('video/(mp4|quicktime|webm|x-msvideo)');
-      allow update, delete: if active() && (request.auth.uid == ownerId || superAdmin());
+      allow create, update: if false;
+      allow delete: if active() && (request.auth.uid == ownerId || superAdmin());
     }
+    match /{allPaths=**} { allow read, write: if false; }
   }
 }

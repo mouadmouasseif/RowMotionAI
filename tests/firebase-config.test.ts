@@ -12,8 +12,8 @@ describe("Firebase Storage configuration", () => {
       .toBe("rowmotion-ai.firebasestorage.app");
   });
 
-  it("supports legacy appspot buckets", () => {
+  it("normalizes legacy appspot buckets to the configured Firebase bucket", () => {
     expect(resolveStorageBucket("rowmotion-ai", "rowmotion-ai.appspot.com"))
-      .toBe("rowmotion-ai.appspot.com");
+      .toBe("rowmotion-ai.firebasestorage.app");
   });
 });
