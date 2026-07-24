@@ -1,24 +1,64 @@
 "use client";
-/* eslint-disable @next/next/no-img-element */
-import { useEffect,useState } from "react";
-import { Building2,Download,Eye,Filter,MoreHorizontal,Pencil,Plus,Search,Users } from "lucide-react";
+
+import { useCallback, useEffect, useState } from "react";
+import Image from "next/image";
+import Link from "next/link";
+import { Building2, Download, Eye, Filter, ImagePlus, MoreHorizontal, Pencil, Plus, Search, Users } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { ProtectedPage } from "@/components/ProtectedPage";
 import { useAuth } from "@/providers/AuthProvider";
-import { createClub,listClubs } from "@/services/club-service";
+import { createClub, listClubs } from "@/services/club-service";
+import { uploadClubLogo, validateProfileImage } from "@/services/profile-media-service";
 import type { Club } from "@/types/club";
 
-function ClubsContent(){
-  const {profile}=useAuth();const [clubs,setClubs]=useState<Club[]>([]);const [showForm,setShowForm]=useState(false);const [error,setError]=useState("");const [search,setSearch]=useState("");
-  useEffect(()=>{if(profile)void listClubs(profile).then(setClubs).catch(()=>setError("Impossible de charger les clubs."));},[profile]);
-  if(!profile)return null;
-  const filtered=clubs.filter((club)=>`${club.name} ${club.city??""} ${club.country??""}`.toLowerCase().includes(search.toLowerCase()));
-  return <AppShell referenceMode title="Clubs" subtitle="Gérez tous les clubs enregistrés sur la plateforme." headerActions={<><button className="button primary" onClick={()=>setShowForm((value)=>!value)}><Plus/>Ajouter un club</button><button className="button ghost"><Download/>Exporter</button><button className="reference-more"><MoreHorizontal/></button></>}>
+function ClubsContent() {
+  const { profile } = useAuth();
+  const [clubs, setClubs] = useState<Club[]>([]);
+  const [showForm, setShowForm] = useState(false);
+  const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [error, setError] = useState("");
+  const [search, setSearch] = useState("");
+
+  const load = useCallback(async () => {
+    if (profile) setClubs(await listClubs(profile));
+  }, [profile]);
+  useEffect(() => { void load().catch(() => setError("Impossible de charger les clubs.")); }, [load]);
+  if (!profile) return null;
+  const filtered = clubs.filter((club) => `${club.name} ${club.city ?? ""} ${club.country ?? ""}`.toLowerCase().includes(search.toLowerCase()));
+
+  const submit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    try {
+      const id = await createClub(profile, {
+        name: String(form.get("name") ?? ""),
+        shortName: String(form.get("shortName") ?? "") || null,
+        city: String(form.get("city") ?? "") || null,
+        country: String(form.get("country") ?? "") || null,
+        email: String(form.get("email") ?? "") || null,
+        phone: String(form.get("phone") ?? "") || null,
+        active: true,
+      });
+      if (logoFile) await uploadClubLogo(id, logoFile);
+      await load();
+      setLogoFile(null);
+      setShowForm(false);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Création impossible.");
+    }
+  };
+
+  return <AppShell referenceMode title="Clubs" subtitle="Gérez tous les clubs enregistrés sur la plateforme." headerActions={<><button className="button primary" onClick={() => setShowForm((value) => !value)}><Plus />Ajouter un club</button><button className="button ghost"><Download />Exporter</button><button className="reference-more"><MoreHorizontal /></button></>}>
     <div className="directory-reference clubs-reference">
-      <section className="club-stats">{[["Total des clubs",clubs.length||16,"blue"],["Clubs actifs",clubs.filter((club)=>club.active).length||14,"green"],["En attente",2,"yellow"],["Suspendus",0,"red"]].map(([label,value,color])=><article key={label}><i className={String(color)}><Building2/></i><span><strong>{value}</strong><small>{label}</small></span></article>)}</section>
-      {showForm&&<form className="club-create-form" onSubmit={(event)=>{event.preventDefault();const form=new FormData(event.currentTarget);void createClub(profile,{name:String(form.get("name")??""),shortName:String(form.get("shortName")??"")||null,city:String(form.get("city")??"")||null,country:String(form.get("country")??"")||null,email:String(form.get("email")??"")||null,phone:String(form.get("phone")??"")||null,active:true}).then((id)=>{setClubs((current)=>[...current,{id,name:String(form.get("name")),shortName:String(form.get("shortName"))||null,city:String(form.get("city"))||null,country:String(form.get("country"))||null,email:String(form.get("email"))||null,phone:String(form.get("phone"))||null,logoUrl:null,active:true,createdBy:profile.uid}]);setShowForm(false);}).catch((reason)=>setError(reason instanceof Error?reason.message:"Création impossible."));}}><input name="name" placeholder="Nom du club" required/><input name="shortName" placeholder="Nom court"/><input name="city" placeholder="Ville"/><input name="country" placeholder="Pays"/><input name="email" type="email" placeholder="E-mail"/><input name="phone" placeholder="Téléphone"/><button className="button primary">Enregistrer</button></form>}
-      <div className="directory-layout clubs-layout"><main><div className="directory-filters"><label><Search/><input value={search} onChange={(event)=>setSearch(event.target.value)} placeholder="Rechercher un club (nom, ville, pays...)"/></label><select><option>Tous les statuts</option></select><select><option>Toutes les villes</option></select><select><option>Tous les pays</option></select><button><Filter/>Filtres</button><button className="reset-filter">Réinitialiser</button></div>{error&&<div className="error-card">{error}</div>}<section className="directory-table clubs-directory"><header><span>Club</span><span>Ville</span><span>Pays</span><span>Coach principal</span><span>Athlètes</span><span>Statut</span><span>Date d’inscription</span><span>Actions</span></header>{filtered.map((club,index)=><article key={club.id}><div className="club-identity"><span>{club.logoUrl?/* eslint-disable-next-line @next/next/no-img-element */<img src={club.logoUrl} alt=""/>:<Building2/>}</span><p><strong>{club.name}</strong><small>Créé le 12 Janv. 2024</small></p></div><span>{club.city??"Lyon"}</span><span>🇫🇷 {club.country??"France"}<small>FRA</small></span><div className="directory-person"><span className="fake-avatar">{["JL","CB","TD","CM"][index%4]}</span><span><strong>{["Julien Lefebvre","Camille Bernard","Thomas Dubois","Claire Moreau"][index%4]}</strong><small>Coach Principal</small></span></div><span><Users/> {18+index*2}</span><em className={`directory-status ${club.active?"":"pending"}`}>{club.active?"Actif":"En attente"}</em><span>12 Janv. 2024</span><span className="directory-actions"><button><Eye/></button><button><Pencil/></button><button><MoreHorizontal/></button></span></article>)}{filtered.length===0&&<div className="empty-state"><Building2/><h2>Aucun club enregistré</h2></div>}<footer><label>Affichage <select><option>10</option></select> par page</label><nav><button>‹</button><button className="active">1</button><button>2</button><button>›</button></nav><span>1-{Math.min(filtered.length,8)} sur {filtered.length||16} clubs</span></footer></section></main><aside className="directory-sidebar"><section><h2>Aperçu des clubs</h2><div className="mini-directory-donut"/><ul><li>🟢 Actifs <strong>14 (87%)</strong></li><li>🟡 En attente <strong>2 (13%)</strong></li><li>🔴 Suspendus <strong>0 (0%)</strong></li></ul></section><section><h2>Répartition par pays</h2>{["🇫🇷 France 16","🇲🇦 Maroc 0","🇮🇹 Italie 0","🇧🇪 Belgique 0"].map((row)=><p key={row}>{row}</p>)}<a>Voir tous les pays →</a></section><section><h2>Activités récentes</h2><p>Nautic Club Nantes · Club mis à jour</p><p>Rowing Club Strasbourg · Demande d’adhésion</p><p>Aviron Club de Lyon · Nouveau coach ajouté</p></section><section><h2>Actions rapides</h2><button>⊕ Ajouter un club</button><button>⇩ Exporter la liste des clubs</button><button>▣ Rapport des clubs</button></section></aside></div>
+      <section className="club-stats">{[["Total des clubs", clubs.length, "blue"], ["Clubs actifs", clubs.filter((club) => club.active).length, "green"], ["En attente", clubs.filter((club) => !club.active).length, "yellow"], ["Suspendus", 0, "red"]].map(([label, value, color]) => <article key={label}><i className={String(color)}><Building2 /></i><span><strong>{value}</strong><small>{label}</small></span></article>)}</section>
+      {showForm && <form className="club-create-reference" onSubmit={submit}><h2>Nouveau club</h2><div className="club-logo-upload"><label><ImagePlus />{logoFile ? logoFile.name : "Téléverser le logo"}<input hidden type="file" accept="image/jpeg,image/png,image/webp" onChange={(event) => { const file = event.target.files?.[0]; if (!file) return; try { validateProfileImage(file); setLogoFile(file); setError(""); } catch (reason) { setError(reason instanceof Error ? reason.message : "Logo invalide."); } }} /></label><small>JPG, PNG ou WebP · 5 Mo maximum</small></div><div className="club-create-fields">{[["name", "Nom du club"], ["shortName", "Nom court"], ["city", "Ville"], ["country", "Pays"], ["email", "E-mail"], ["phone", "Téléphone"]].map(([name, placeholder]) => <input key={name} name={name} placeholder={placeholder} required={name === "name"} />)}</div><button className="button primary">Créer le club</button></form>}
+      {error && <div className="error-card">{error}</div>}
+      <div className="directory-layout clubs-layout"><main><div className="directory-filters"><label><Search /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Rechercher un club..." /></label><select><option>Tous les statuts</option></select><select><option>Toutes les villes</option></select><select><option>Tous les pays</option></select><button><Filter />Filtres</button></div>
+        <section className="directory-table clubs-directory"><header><span>Club</span><span>Ville</span><span>Pays</span><span>Contact</span><span>Membres</span><span>Statut</span><span>Création</span><span>Actions</span></header>{filtered.map((club) => <article key={club.id}><div className="club-identity"><span>{club.logoUrl ? <Image src={club.logoUrl} alt="" width={45} height={45} /> : <Building2 />}</span><p><strong>{club.name}</strong><small>{club.shortName ?? club.id}</small></p></div><span>{club.city ?? "—"}</span><span>{club.country ?? "—"}</span><span>{club.email ?? club.phone ?? "—"}</span><span><Users /> —</span><em className={`directory-status ${club.active ? "" : "pending"}`}>{club.active ? "Actif" : "En attente"}</em><span>—</span><span className="directory-actions"><Link href={`/clubs/${club.id}`}><Eye /></Link><Link href={`/clubs/${club.id}`}><Pencil /></Link></span></article>)}
+          {filtered.length === 0 && <div className="empty-state"><Building2 /><h2>Aucun club enregistré</h2></div>}
+        </section>
+      </main><aside className="directory-sidebar"><section><h2>Aperçu des clubs</h2><div className="mini-directory-donut" /><ul><li>Actifs <strong>{clubs.filter((club) => club.active).length}</strong></li><li>En attente <strong>{clubs.filter((club) => !club.active).length}</strong></li></ul></section></aside></div>
     </div>
   </AppShell>;
 }
-export default function ClubsPage(){return <ProtectedPage allowedRoles={["superadmin"]}><ClubsContent/></ProtectedPage>;}
+export default function ClubsPage() { return <ProtectedPage allowedRoles={["superadmin"]}><ClubsContent /></ProtectedPage>; }

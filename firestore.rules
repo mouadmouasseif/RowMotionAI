@@ -79,6 +79,11 @@ service cloud.firestore {
         || (isCoach() && resource.data.createdBy == request.auth.uid);
     }
 
+    match /competitionResults/{resultId} {
+      allow read: if isActive();
+      allow create, update, delete: if isSuperAdmin() || isClubAdmin() || isCoach();
+    }
+
     match /athleteQrScans/{scanId} {
       allow create: if isSignedIn() && request.resource.data.authenticatedUserId == request.auth.uid;
       allow read: if isSuperAdmin() || (isSignedIn() && request.auth.uid == resource.data.athleteId);

@@ -2,13 +2,14 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Bell, ChevronDown, LogOut, Menu, Radio, Upload, X } from "lucide-react";
+import { Bell, Camera, ChevronDown, LogOut, Menu, Radio, Upload, X } from "lucide-react";
 import { useState } from "react";
 import { Brand } from "@/components/Brand";
 import { ProfileAvatar } from "@/components/profile/ProfileAvatar";
 import { InstallButton } from "@/components/pwa/InstallButton";
-import { navigationItems } from "@/lib/navigation";
+import { navigationSections } from "@/lib/navigation";
 import { useAuth } from "@/providers/AuthProvider";
+import { uploadClubLogo, uploadProfilePhoto, validateProfileImage } from "@/services/profile-media-service";
 
 interface AppShellProps {
   children: React.ReactNode;
@@ -38,16 +39,22 @@ export function AppShell({
   const pathname = usePathname();
   const router = useRouter();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [photoBusy, setPhotoBusy] = useState(false);
 
   if (!profile) return null;
 
   const name = `${profile.firstName} ${profile.lastName}`.trim() || profile.email;
+  const managedPhotoMatch = pathname.match(/^\/(?:athletes|coaches)\/([^/]+)$/);
+  const managedPhotoId = managedPhotoMatch?.[1] ?? null;
+  const managedClubMatch = pathname.match(/^\/clubs\/([^/]+)$/);
+  const managedClubId = managedClubMatch?.[1] ?? null;
   const handleLogout = async () => {
     await logout();
     router.replace("/");
   };
 
-  const useReferenceLayout = dashboardMode || referenceMode;
+  // Every authenticated page shares this single menu and shell.
+  const useReferenceLayout = Boolean(dashboardMode || referenceMode || true);
 
   return (
     <main className={`dashboard-page${useReferenceLayout ? " dashboard-reference" : ""}`}>
@@ -78,24 +85,31 @@ export function AppShell({
           </Link>
         )}
         <nav>
-          {navigationItems
-            .filter((item) => item.roles.includes(profile.role))
-            .map(({ href, label, icon: Icon }) => (
-              <Link
-                key={href}
-                onClick={() => setMobileOpen(false)}
-                className={
-                  pathname === href ||
-                  (href !== "/tableau-de-bord" && pathname.startsWith(`${href}/`))
-                    ? "current"
-                    : ""
-                }
-                href={href}
-              >
-                <Icon />
-                {label}
-              </Link>
-            ))}
+          {navigationSections.map((section) => {
+            const items = section.items.filter((item) => item.roles.includes(profile.role));
+            if (items.length === 0) return null;
+            return (
+              <section className="sidebar-section" key={section.label}>
+                <h2>{section.label}</h2>
+                {items.map(({ href, label, icon: Icon }) => (
+                  <Link
+                    key={href}
+                    onClick={() => setMobileOpen(false)}
+                    className={
+                      pathname === href ||
+                      (href !== "/tableau-de-bord" && pathname.startsWith(`${href}/`))
+                        ? "current"
+                        : ""
+                    }
+                    href={href}
+                  >
+                    <Icon />
+                    {label}
+                  </Link>
+                ))}
+              </section>
+            );
+          })}
         </nav>
         {pathname !== "/parametres" && <InstallButton compact />}
         <button className="logout" onClick={() => void handleLogout()}>
@@ -127,7 +141,65 @@ export function AppShell({
             )}
           </div>
           {headerActions ? (
-            <div className="dashboard-header-actions">{headerActions}</div>
+            <div className="dashboard-header-actions">
+              {headerActions}
+              {managedPhotoId && (
+                <label className="button ghost managed-photo-button">
+                  <Camera />
+                  {photoBusy ? "Téléversement…" : "Photo"}
+                  <input
+                    hidden
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    disabled={photoBusy}
+                    onChange={(event) => {
+                      const file = event.target.files?.[0];
+                      if (!file) return;
+                      try {
+                        validateProfileImage(file);
+                        setPhotoBusy(true);
+                        void uploadProfilePhoto(managedPhotoId, file)
+                          .then(() => router.refresh())
+                          .catch((error: unknown) => {
+                            console.error("[RowMotion] Profile photo upload failed:", error);
+                          })
+                          .finally(() => setPhotoBusy(false));
+                      } catch {
+                        setPhotoBusy(false);
+                      }
+                    }}
+                  />
+                </label>
+              )}
+              {managedClubId && (
+                <label className="button ghost managed-photo-button">
+                  <Camera />
+                  {photoBusy ? "Téléversement…" : "Logo"}
+                  <input
+                    hidden
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    disabled={photoBusy}
+                    onChange={(event) => {
+                      const file = event.target.files?.[0];
+                      if (!file) return;
+                      try {
+                        validateProfileImage(file);
+                        setPhotoBusy(true);
+                        void uploadClubLogo(managedClubId, file)
+                          .then(() => router.refresh())
+                          .catch((error: unknown) => {
+                            console.error("[RowMotion] Club logo upload failed:", error);
+                          })
+                          .finally(() => setPhotoBusy(false));
+                      } catch {
+                        setPhotoBusy(false);
+                      }
+                    }}
+                  />
+                </label>
+              )}
+            </div>
           ) : dashboardMode ? (
             <div className="dashboard-header-actions">
               <Link className="button primary" href="/analyses/nouvelle">
