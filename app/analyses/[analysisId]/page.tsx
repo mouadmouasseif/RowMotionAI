@@ -1,60 +1,130 @@
 "use client";
 
-import { use, useEffect, useState } from "react";
+import { use, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
   ArrowLeft,
   BarChart3,
-  Check,
-  ChevronRight,
+  CheckCircle2,
   Download,
   Gauge,
   MoreHorizontal,
   Play,
-  Radio,
   RotateCcw,
   Share2,
   Sparkles,
   Square,
+  TrendingUp,
+  Video,
   Waves,
+  Zap,
 } from "lucide-react";
-import { AppShell } from "@/components/AppShell";
 import { AnalysisVideoSource } from "@/components/AnalysisVideoSource";
+import { AppShell } from "@/components/AppShell";
 import { ProtectedPage } from "@/components/ProtectedPage";
 import { useAuth } from "@/providers/AuthProvider";
 import {
   cancelAnalysis,
+  listAnalyses,
   retryAnalysis,
   subscribeToAnalysis,
   updateAnalysis,
 } from "@/services/analysis-service";
-import type { RowingAnalysis } from "@/types/analysis";
+import type { AnalysisMetrics, RowingAnalysis } from "@/types/analysis";
 
-const phaseRows = [
-  ["Prise d’eau", "8.5", "Excellent", "blue"],
-  ["Impulsion", "9.2", "Excellent", "green"],
-  ["Fin d’impulsion", "8.7", "Très bien", "yellow"],
-  ["Retour", "7.8", "Bien", "purple"],
-  ["Préparation", "8.3", "Très bien", "blue"],
+type ComparisonMode = "general" | "video" | "training";
+type MetricKey = keyof AnalysisMetrics | "technicalScore" | "durationSeconds";
+
+interface MetricDefinition {
+  key: MetricKey;
+  label: string;
+  unit: string;
+  higherIsBetter: boolean;
+}
+
+const metricDefinitions: MetricDefinition[] = [
+  { key: "technicalScore", label: "Score technique", unit: "/10", higherIsBetter: true },
+  { key: "strokeRate", label: "Cadence moyenne", unit: "spm", higherIsBetter: true },
+  { key: "estimatedPower", label: "Puissance moyenne", unit: "W", higherIsBetter: true },
+  { key: "strokeLength", label: "Longueur du coup", unit: "m", higherIsBetter: true },
+  { key: "symmetryScore", label: "Symétrie", unit: "%", higherIsBetter: true },
+  { key: "rhythmScore", label: "Régularité", unit: "%", higherIsBetter: true },
+  { key: "backAngle", label: "Angle du dos", unit: "°", higherIsBetter: false },
+  { key: "durationSeconds", label: "Durée", unit: "s", higherIsBetter: false },
 ];
 
-function MiniGraph({ offset = 0 }: { offset?: number }) {
-  const blue = [46,39,48,28,42,25,31,20,36,29,33,23,40,30,34,27,38,31,29,35];
-  const green = [51,47,43,39,36,35,34,32,31,30,31,29,28,28,27,26,28,27,25,26];
-  const path = (values: number[]) => values.map((value, index) => `${index ? "L" : "M"} ${index * 9} ${value + offset}`).join(" ");
-  return <svg viewBox="0 0 175 65" preserveAspectRatio="none"><path d={path(blue)} /><path className="reference" d={path(green)} /></svg>;
+const environmentLabels: Record<RowingAnalysis["environment"], string> = {
+  boat: "Sur l’eau",
+  ergometer: "Ergomètre",
+  beach_sprint: "Beach Sprint",
+};
+const trainingLabels = {
+  technique: "Technique",
+  endurance: "Endurance",
+  power: "Puissance",
+  interval: "Intervalles",
+  recovery: "Récupération",
+  competition: "Compétition",
+} as const;
+
+function metricValue(analysis: RowingAnalysis, key: MetricKey): number | null {
+  if (key === "technicalScore") {
+    if (analysis.technicalScore == null) return null;
+    return analysis.technicalScore > 10 ? analysis.technicalScore / 10 : analysis.technicalScore;
+  }
+  if (key === "durationSeconds") return analysis.durationSeconds;
+  return analysis.metrics?.[key] ?? null;
+}
+
+function average(rows: RowingAnalysis[], key: MetricKey) {
+  const values = rows.map((row) => metricValue(row, key)).filter((value): value is number => value != null);
+  return values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : null;
+}
+
+function formatMetric(value: number | null, unit: string) {
+  if (value == null) return "—";
+  const digits = unit === "m" || unit === "/10" ? 2 : 1;
+  return `${value.toFixed(digits)} ${unit}`.trim();
+}
+
+function dateLabel(value: unknown) {
+  if (value && typeof value === "object" && "toDate" in value && typeof value.toDate === "function") {
+    return value.toDate().toLocaleDateString("fr-FR");
+  }
+  return "Date non renseignée";
+}
+
+function AnalysisCurve({ analysis }: { analysis: RowingAnalysis }) {
+  const cycles = analysis.cycles ?? [];
+  if (cycles.length < 2) {
+    return <div className="analysis-no-series">Aucune série temporelle enregistrée pour cette analyse.</div>;
+  }
+  const points = cycles.map((cycle, index) => {
+    const value = cycle.strokeRate || 0;
+    const x = (index / Math.max(cycles.length - 1, 1)) * 100;
+    const y = 92 - Math.min(Math.max(value, 0), 60) * 1.25;
+    return `${x},${y}`;
+  }).join(" ");
+  return (
+    <svg className="analysis-dynamic-chart" viewBox="0 0 100 100" preserveAspectRatio="none">
+      <polyline points={points} />
+    </svg>
+  );
 }
 
 function Detail({ id }: { id: string }) {
   const { profile } = useAuth();
   const [analysis, setAnalysis] = useState<RowingAnalysis | null>(null);
+  const [history, setHistory] = useState<RowingAnalysis[]>([]);
   const [error, setError] = useState("");
   const [note, setNote] = useState("");
-  const [tab, setTab] = useState("Vue d’ensemble");
+  const [tab, setTab] = useState<"summary" | "technique" | "comparison">("summary");
+  const [comparisonMode, setComparisonMode] = useState<ComparisonMode>("general");
+  const [selectedVideoId, setSelectedVideoId] = useState("");
 
   useEffect(() => {
     if (!profile) return;
-    return subscribeToAnalysis(
+    const unsubscribe = subscribeToAnalysis(
       id,
       profile,
       (value) => {
@@ -64,105 +134,184 @@ function Detail({ id }: { id: string }) {
       },
       (reason) => setError(reason.message),
     );
+    void listAnalyses(profile, 500)
+      .then(setHistory)
+      .catch((reason: unknown) => setError(reason instanceof Error ? reason.message : "Historique indisponible."));
+    return unsubscribe;
   }, [id, profile]);
+
+  const athleteHistory = useMemo(
+    () => history.filter((row) => row.athleteId === analysis?.athleteId && row.status === "completed"),
+    [analysis?.athleteId, history],
+  );
+  const sameTraining = useMemo(
+    () => athleteHistory.filter((row) =>
+      analysis?.trainingType
+        ? row.trainingType === analysis.trainingType
+        : row.environment === analysis?.environment,
+    ),
+    [analysis?.environment, analysis?.trainingType, athleteHistory],
+  );
+  const comparableVideos = athleteHistory.filter((row) => row.id !== analysis?.id);
+  const selectedVideo = comparableVideos.find((row) => row.id === selectedVideoId) ?? comparableVideos[0] ?? null;
+  const comparisonRows = comparisonMode === "training"
+    ? sameTraining.filter((row) => row.id !== analysis?.id)
+    : comparisonMode === "video" && selectedVideo
+      ? [selectedVideo]
+      : athleteHistory.filter((row) => row.id !== analysis?.id);
 
   if (!profile) return null;
 
-  const score = analysis?.technicalScore ? analysis.technicalScore / 10 : 8.7;
-  const cadence = analysis?.metrics?.strokeRate ?? 28;
-  const power = analysis?.metrics?.estimatedPower ?? 268;
-  const distance = "6,310";
+  const share = async () => {
+    const url = window.location.href;
+    if (navigator.share) await navigator.share({ title: "Analyse RowMotion AI", url });
+    else await navigator.clipboard.writeText(url);
+  };
+
+  const title = analysis ? `Analyse vidéo – ${environmentLabels[analysis.environment]}` : "Analyse vidéo";
   const subtitle = analysis
-    ? `${analysis.fileName || "Séance du 18 Mai 2025"} · ${analysis.environment === "boat" ? "Sur l’eau" : "Ergomètre Concept2"} · 20:45 · 6,310 m`
-    : "Chargement de la séance…";
+    ? `${analysis.athleteName} · ${analysis.fileName || "Vidéo"} · ${dateLabel(analysis.createdAt)}`
+    : "Chargement de l’analyse…";
 
   return (
     <AppShell
       referenceMode
-      title="Analyse détaillée"
+      title={title}
       subtitle={subtitle}
       headerActions={
         <>
-          <button className="button ghost"><Download />Exporter le rapport</button>
-          <button className="button ghost"><Share2 />Partager</button>
+          <button className="button ghost" onClick={() => window.print()}><Download />Exporter le rapport</button>
+          <button className="button ghost" onClick={() => void share()}><Share2 />Partager</button>
           <button className="reference-more" aria-label="Plus d’options"><MoreHorizontal /></button>
         </>
       }
     >
-      <div className="analysis-detail-reference">
+      <div className="video-analysis-reference">
         <Link className="detail-back" href="/analyses"><ArrowLeft />Retour aux analyses</Link>
         {error ? <div className="error-card">{error}</div> : !analysis ? (
           <div className="loading-card">Chargement…</div>
         ) : (
           <>
-            <nav className="detail-tabs">
-              {["Vue d’ensemble", "Technique", "Courbes & données", "Comparaison", "Rapport"].map((item) => <button key={item} className={tab === item ? "active" : ""} onClick={() => setTab(item)}>{item}</button>)}
+            <nav className="video-analysis-tabs">
+              <button className={tab === "summary" ? "active" : ""} onClick={() => setTab("summary")}>Résumé</button>
+              <button className={tab === "technique" ? "active" : ""} onClick={() => setTab("technique")}>Angles & technique</button>
+              <button className={tab === "comparison" ? "active" : ""} onClick={() => setTab("comparison")}>Comparaison</button>
             </nav>
 
             {analysis.status !== "completed" && (
               <div className="detail-processing">
-                <Gauge /><span><strong>Analyse {analysis.status}</strong><small>{analysis.progress?.progress ?? 0}% · {analysis.progress?.processedFrames ?? 0}/{analysis.progress?.totalFrames ?? 0} images</small></span>
+                <Gauge />
+                <span><strong>Analyse {analysis.status}</strong><small>{analysis.progress?.progress ?? 0}% · {analysis.progress?.processedFrames ?? 0}/{analysis.progress?.totalFrames ?? 0} images</small></span>
                 {["queued", "processing"].includes(analysis.status) && <button onClick={() => void cancelAnalysis(id)}><Square />Annuler</button>}
                 {["failed", "cancelled"].includes(analysis.status) && <button onClick={() => void retryAnalysis(id)}><RotateCcw />Relancer</button>}
               </div>
             )}
 
-            <section className="detail-top-grid">
-              <article className="detail-video-card">
-                <select aria-label="Angle de vue"><option>Angle du côté droit</option></select>
-                <div className="detail-video-stage">
-                  <AnalysisVideoSource analysis={analysis} />
-                  {!analysis.videoUrl && analysis.videoStorageMode !== "local" && <div className="detail-video-placeholder"><Waves /><Play /></div>}
-                  <div className="pose-overlay">
-                    <span className="pose-trunk">Tronc<strong>14°</strong></span>
-                    <span className="pose-arms">Bras<strong>92°</strong></span>
-                    <span className="pose-legs">Jambes<strong>108°</strong></span>
+            {tab !== "comparison" && (
+              <div className="video-analysis-layout">
+                <main>
+                  <section className="video-stage-reference">
+                    <div className="video-stage-label"><Video />{environmentLabels[analysis.environment]}</div>
+                    <AnalysisVideoSource analysis={analysis} />
+                    {!analysis.videoUrl && analysis.videoStorageMode !== "local" && (
+                      <div className="detail-video-placeholder"><Waves /><Play /></div>
+                    )}
+                  </section>
+                  <section className="dynamic-curve-card">
+                    <div><h2>Courbe de cadence</h2><small>Données calculées cycle par cycle</small></div>
+                    <AnalysisCurve analysis={analysis} />
+                  </section>
+                  <section className="cycle-phases-card">
+                    <h2>Phases et cycles détectés</h2>
+                    <div>
+                      {(analysis.cycles ?? []).slice(0, 8).map((cycle) => (
+                        <article key={cycle.index}>
+                          <strong>Cycle {cycle.index + 1}</strong>
+                          <span>{cycle.strokeRate.toFixed(1)} spm</span>
+                          <small>{cycle.duration.toFixed(2)} s</small>
+                        </article>
+                      ))}
+                      {!analysis.cycles?.length && <p>Aucun cycle détaillé enregistré.</p>}
+                    </div>
+                  </section>
+                </main>
+                <aside>
+                  <section className="analysis-indicators">
+                    <h2>Indicateurs clés</h2>
+                    <div>
+                      {metricDefinitions.slice(0, 6).map((metric) => (
+                        <article key={metric.key}>
+                          {metric.key === "estimatedPower" ? <Zap /> : metric.key === "technicalScore" ? <TrendingUp /> : <BarChart3 />}
+                          <small>{metric.label}</small>
+                          <strong>{formatMetric(metricValue(analysis, metric.key), metric.unit)}</strong>
+                        </article>
+                      ))}
+                    </div>
+                  </section>
+                  <section className="analysis-strengths">
+                    <h2>Résultats techniques</h2>
+                    {(analysis.recommendations ?? []).length ? analysis.recommendations.map((item) => <p key={item}><Sparkles />{item}</p>) : <p>Aucune recommandation enregistrée.</p>}
+                    {(analysis.errors ?? []).map((item) => <p className="warning" key={item}><CheckCircle2 />{item}</p>)}
+                  </section>
+                </aside>
+              </div>
+            )}
+
+            {tab === "comparison" && (
+              <section className="analysis-comparison-reference">
+                <header>
+                  <div>
+                    <h2>Comparaison des performances</h2>
+                    <p>Calculée uniquement à partir des analyses Firebase autorisées.</p>
                   </div>
+                  <nav>
+                    <button className={comparisonMode === "general" ? "active" : ""} onClick={() => setComparisonMode("general")}>Générale</button>
+                    <button className={comparisonMode === "video" ? "active" : ""} onClick={() => setComparisonMode("video")}>Par vidéo</button>
+                    <button className={comparisonMode === "training" ? "active" : ""} onClick={() => setComparisonMode("training")}>Par entraînement</button>
+                  </nav>
+                </header>
+                <div className="comparison-context">
+                  <article><small>Cette analyse</small><strong>{analysis.fileName || analysis.id}</strong><span>{environmentLabels[analysis.environment]} · {analysis.trainingType ? trainingLabels[analysis.trainingType] : "Type non renseigné"}</span></article>
+                  <article><small>Base comparée</small><strong>{comparisonRows.length} analyse{comparisonRows.length > 1 ? "s" : ""}</strong><span>{comparisonMode === "training" ? (analysis.trainingType ? trainingLabels[analysis.trainingType] : environmentLabels[analysis.environment]) : comparisonMode === "video" ? "Vidéo sélectionnée" : "Historique de l’athlète"}</span></article>
+                  {comparisonMode === "video" && (
+                    <label>Vidéo de comparaison
+                      <select value={selectedVideo?.id ?? ""} onChange={(event) => setSelectedVideoId(event.target.value)}>
+                        {comparableVideos.map((row) => <option value={row.id} key={row.id}>{row.fileName || row.id} · {dateLabel(row.createdAt)}</option>)}
+                      </select>
+                    </label>
+                  )}
                 </div>
-              </article>
-
-              <article className="detail-phases">
-                <h2>Phases du coup d’aviron</h2>
-                <div className="phase-timeline">
-                  {phaseRows.map(([name,, , color], index) => <div key={name}><i className={color}>{index + 1}</i><strong>{name}</strong><small>00:{String(index * 3).padStart(2, "0")}</small></div>)}
+                <div className="comparison-table">
+                  <header><span>Métrique</span><span>Cette analyse</span><span>Comparaison</span><span>Écart</span></header>
+                  {metricDefinitions.map((metric) => {
+                    const current = metricValue(analysis, metric.key);
+                    const compared = average(comparisonRows, metric.key);
+                    const delta = current != null && compared != null ? current - compared : null;
+                    const positive = delta != null && (metric.higherIsBetter ? delta >= 0 : delta <= 0);
+                    const width = current == null || compared == null || Math.max(Math.abs(current), Math.abs(compared)) === 0
+                      ? 0
+                      : Math.min((Math.abs(current) / Math.max(Math.abs(current), Math.abs(compared))) * 100, 100);
+                    return (
+                      <article key={metric.key}>
+                        <strong>{metric.label}</strong>
+                        <span>{formatMetric(current, metric.unit)}<i><b style={{ width: `${width}%` }} /></i></span>
+                        <span>{formatMetric(compared, metric.unit)}</span>
+                        <em className={delta == null ? "" : positive ? "positive" : "negative"}>{delta == null ? "—" : `${delta > 0 ? "+" : ""}${delta.toFixed(2)} ${metric.unit}`}</em>
+                      </article>
+                    );
+                  })}
                 </div>
-                <hr />
-                <h3>Instants clés</h3>
-                {[
-                  ["Prise d’eau", "Bonne position des épaules", "00:00"],
-                  ["Fin d’impulsion", "Angle du dos correct", "00:04"],
-                  ["Retour", "Jambes rentrées trop tôt", "00:07"],
-                ].map(([name, detail, time]) => <div className="key-moment" key={name}><span><Waves /></span><p><strong>{name}</strong><small>{detail}</small></p><time>{time}</time><button><Play /></button></div>)}
-                <Link href="#courbes">Afficher toutes les images clés <ChevronRight /></Link>
-              </article>
+                {!comparisonRows.length && <div className="notice-card">Aucune autre analyse compatible n’est disponible pour cette comparaison.</div>}
+              </section>
+            )}
 
-              <aside className="detail-summary-column">
-                <section className="global-score"><h2>Score technique global</h2><div><span className="large-score"><strong>{score.toFixed(1)}</strong><small>/10</small><em>Excellent</em></span><p>vs dernière analyse<strong>↑ +0.6</strong></p></div><p>Excellente séance ! Votre technique est solide avec quelques points d’amélioration pour gagner encore en efficacité.</p></section>
-                <section className="key-metrics-card"><h2>Métriques clés</h2><div>{[["Cadence moyenne", cadence, "spm", "↑ 2 spm"],["Puissance moyenne", power, "w", "↑ 18 w"],["Distance", distance, "m", "↑ 310 m"],["Allure moyenne", "2:18.4", "/500m", "↓ 1.6 s"],["Temps total", "20:45", "", "↑ 45 s"],["Score régularité", "8.2", "/10", "↑ 0.5"]].map(([label,value,unit,trend]) => <span key={label}><small>{label}</small><strong>{value}<i>{unit}</i></strong><em className={String(trend).startsWith("↓") ? "down" : ""}>{trend}</em></span>)}</div></section>
-              </aside>
-            </section>
-
-            <section className="detail-middle-grid">
-              <article className="phase-evaluation"><h2>Évaluation technique par phase</h2>{phaseRows.map(([name,value,label,color], index) => <button className={index === 1 ? "active" : ""} key={name}><i className={color}>{index + 1}</i><span>{name}</span><strong>{value}<small>/10</small></strong><em>● {label}</em><b>⌄</b></button>)}</article>
-              <article className="phase-detail"><div className="reference-card-title"><h2>Détails de la phase : Impulsion</h2><Link href="#">Détails biomécaniques <ChevronRight /></Link></div><div className="phase-detail-content">
-                <section><h3>Angles moyens</h3>{[["Dos","14°","Idéal: 10°-20°"],["Bras","92°","Idéal: 85°-100°"],["Jambes","108°","Idéal: 100°-120°"]].map(([name,value,ideal]) => <div key={name}><span><strong>{name}</strong><small>{ideal}</small></span><b>{value}</b><Check /></div>)}</section>
-                <section><h3>Force appliquée</h3>{[["Jambes",68],["Dos",22],["Bras",10]].map(([name,value]) => <div className="force-row" key={name}><span>{name}<strong>{value}%</strong></span><i><b style={{width:`${value}%`}} /></i></div>)}</section>
-                <section className="body-position"><h3>Position du corps</h3><Radio /><ul><li>Dos droit <Check /></li><li>Épaules basses <Check /></li><li>Gainage actif <Check /></li><li>Trajectoire optimale <Check /></li></ul></section>
-              </div></article>
-              <aside className="recommendations-card"><div className="reference-card-title"><h2>Recommandations</h2><button>Priorité⌄</button></div>{[
-                ["Améliorer le timing de retour","Rentrez les jambes plus tard et gardez le dos incliné jusqu’à la fin.","Élevée","high"],
-                ["Gainage du tronc","Travaillez le gainage pour une meilleure stabilité du tronc.","Moyenne","medium"],
-                ["Régularité de cadence","Votre cadence varie légèrement, essayez de rester plus constant.","Faible","low"],
-              ].map(([title,text,priority,level]) => <div key={title}><Sparkles /><p><strong>{title}</strong><small>{text}</small><Link href="#">Voir l’exercice associé <ChevronRight /></Link></p><em className={level}>{priority}</em></div>)}<Link className="all-recommendations" href="#">Voir toutes les recommandations <ChevronRight /></Link></aside>
-            </section>
-
-            <section className="curves-card" id="courbes">
-              <div className="reference-card-title"><h2>Courbes & données</h2><select><option>Toutes les phases</option></select></div>
-              <div className="curve-grid">{[["Puissance (W)",power,"w"],["Cadence (spm)",cadence,"spm"],["Allure (/500m)","2:18.4","moyenne"],["Fréquence cardiaque (bpm)",146,"bpm"]].map(([name,value,unit],index) => <article key={name}><header><span>{name}</span><strong>{value}<small>{unit}</small></strong></header><MiniGraph offset={index * 2} /><footer><span>0:00</span><span>5:00</span><span>10:00</span><span>15:00</span><span>20:00</span></footer></article>)}</div>
-              <footer className="curve-totals">{[["Nombre de coups","592"],["Longueur de coup","1.45 m"],["Force peak","612 N"],["Work per stroke","245 J"],["Calories","420 kcal"]].map(([name,value]) => <span key={name}><BarChart3 /><small>{name}</small><strong>{value}</strong></span>)}</footer>
-            </section>
-
-            {["coach", "club_admin", "superadmin"].includes(profile.role) && <section className="coach-note-reference"><h2>Note coach</h2><textarea value={note} onChange={(event) => setNote(event.target.value)} placeholder="Ajoutez votre commentaire technique…" /><button className="button primary" onClick={() => void updateAnalysis(id, { coachComment: note })}>Enregistrer</button></section>}
+            {["coach", "club_admin", "superadmin"].includes(profile.role) && (
+              <section className="coach-note-reference">
+                <h2>Note coach</h2>
+                <textarea value={note} onChange={(event) => setNote(event.target.value)} placeholder="Ajoutez votre commentaire technique…" />
+                <button className="button primary" onClick={() => void updateAnalysis(id, { coachComment: note })}>Enregistrer</button>
+              </section>
+            )}
           </>
         )}
       </div>

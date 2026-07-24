@@ -1,6 +1,6 @@
 import { addDoc, collection, deleteDoc, doc, getDoc, getDocs, limit, onSnapshot, orderBy, query, serverTimestamp, updateDoc, where } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
-import { emptyAnalysisMetrics, initialAnalysisProgress, type AnalysisEnvironment, type AnalysisSource, type RowingAnalysis } from "@/types/analysis";
+import { emptyAnalysisMetrics, initialAnalysisProgress, type AnalysisEnvironment, type AnalysisSource, type AnalysisTrainingType, type RowingAnalysis } from "@/types/analysis";
 import type { UserProfile } from "@/types/user";
 
 function requireFirebase() {
@@ -35,13 +35,13 @@ export async function getAnalysis(id: string, profile: UserProfile): Promise<Row
   return analysis;
 }
 
-export async function createAnalysis(input: { athleteId: string; athleteName: string; environment: AnalysisEnvironment; sourceType: AnalysisSource; profile: UserProfile; fileName?: string }) {
+export async function createAnalysis(input: { athleteId: string; athleteName: string; environment: AnalysisEnvironment; sourceType: AnalysisSource; trainingType?: AnalysisTrainingType; profile: UserProfile; fileName?: string }) {
   const { database, user } = requireFirebase();
   const reference = await addDoc(collection(database, "analyses"), {
     athleteId: input.athleteId, athleteName: input.athleteName,
     coachId: input.profile.role === "coach" ? input.profile.uid : input.profile.coachId,
     clubId: input.profile.clubId, createdBy: user.uid, sourceType: input.sourceType,
-    environment: input.environment, status: input.sourceType === "video" ? "uploading" : "draft",
+    environment: input.environment, trainingType: input.trainingType ?? "technique", status: input.sourceType === "video" ? "uploading" : "draft",
     progress: { ...initialAnalysisProgress, status: input.sourceType === "video" ? "uploading" : "draft", currentStep: input.sourceType === "video" ? "upload" : "validation" },
     videoUrl: null, storagePath: null, videoStorageMode: "none", thumbnailUrl: null, fileName: input.fileName ?? null,
     durationSeconds: null, technicalScore: null, metrics: emptyAnalysisMetrics,

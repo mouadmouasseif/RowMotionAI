@@ -11,7 +11,7 @@ import { createAnalysis, updateAnalysis } from "@/services/analysis-service";
 import { saveLocalAnalysisVideo } from "@/services/local-video-service";
 import { analyzeLocalVideo } from "@/services/local-pose-analysis-service";
 import { inspectAnalysisVideo, MAX_VIDEO_SIZE_MB } from "@/services/storage-service";
-import type { AnalysisEnvironment } from "@/types/analysis";
+import type { AnalysisEnvironment, AnalysisTrainingType } from "@/types/analysis";
 import type { UserProfile } from "@/types/user";
 
 function Content() {
@@ -22,6 +22,7 @@ function Content() {
     params.get("environment") === "ergometer" ? "ergometer" : "boat",
   );
   const [athlete, setAthlete] = useState<UserProfile | null>(null);
+  const [trainingType, setTrainingType] = useState<AnalysisTrainingType>("technique");
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState("");
   const [progress, setProgress] = useState(0);
@@ -67,6 +68,7 @@ function Content() {
         athleteId: athlete.uid,
         athleteName: `${athlete.firstName} ${athlete.lastName}`.trim(),
         environment,
+        trainingType,
         sourceType: "video",
         profile,
         fileName: file.name,
@@ -157,6 +159,24 @@ function Content() {
       </div>
       <div className="step-card">
         <span className="step-number">3</span>
+        <h2>Type d’entraînement</h2>
+        <div className="choice-grid">
+          {([
+            ["technique", "Technique"],
+            ["endurance", "Endurance"],
+            ["power", "Puissance"],
+            ["interval", "Intervalles"],
+            ["recovery", "Récupération"],
+            ["competition", "Compétition"],
+          ] as const).map(([value, label]) => (
+            <button key={value} className={trainingType === value ? "selected" : ""} onClick={() => setTrainingType(value)}>
+              <Dumbbell />{label}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div className="step-card">
+        <span className="step-number">4</span>
         <h2>Vidéo</h2>
         {file ? (
           <div className="video-preview">

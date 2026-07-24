@@ -1,5 +1,6 @@
 export type AnalysisEnvironment = "boat" | "ergometer" | "beach_sprint";
 export type AnalysisSource = "video" | "live";
+export type AnalysisTrainingType = "technique" | "endurance" | "power" | "interval" | "recovery" | "competition";
 export type AnalysisStatus = "draft" | "uploading" | "uploaded" | "queued" | "processing" | "completed" | "failed" | "cancelled";
 export type AnalysisStep = "validation" | "upload" | "video_preprocessing" | "pose_detection" | "stroke_detection" | "metrics_calculation" | "recommendations" | "saving_results" | "completed";
 export type VideoStorageMode = "local" | "firebase" | "none";
@@ -45,6 +46,7 @@ export interface RowingAnalysis {
   durationSeconds: number | null; technicalScore: number | null; metrics: AnalysisMetrics;
   metricValues?: Record<string, MetricValue>; phases: Record<string, unknown>; cycles?: StrokeCycle[];
   errors: string[]; recommendations: string[]; coachComment: string | null;
+  trainingType?: AnalysisTrainingType;
   isLegacy?: boolean; metricsSource?: "biomechanics_engine" | "legacy_simulation";
   createdAt?: unknown; updatedAt?: unknown;
 }
