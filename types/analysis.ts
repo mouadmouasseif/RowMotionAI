@@ -33,6 +33,7 @@ export interface StrokeCycle {
   recoveryTime: number; driveRecoveryRatio: number; strokeRate: number; phases: StrokePhase[];
   metrics: CycleMetrics; errors: TechniqueError[]; confidence: number;
 }
+export interface CadenceSample { time: number; value: number }
 export interface AnalysisJob {
   id: string; analysisId: string; status: "queued" | "processing" | "completed" | "failed" | "dead_letter";
   attempts: number; maxAttempts: number; lockedBy?: string; lockedAt?: unknown; heartbeatAt?: unknown;
@@ -45,6 +46,7 @@ export interface RowingAnalysis {
   videoStorageMode: VideoStorageMode; thumbnailUrl: string | null; fileName: string | null;
   durationSeconds: number | null; technicalScore: number | null; metrics: AnalysisMetrics;
   metricValues?: Record<string, MetricValue>; phases: Record<string, unknown>; cycles?: StrokeCycle[];
+  cadenceTimeline?: CadenceSample[];
   errors: string[]; recommendations: string[]; coachComment: string | null;
   trainingType?: AnalysisTrainingType;
   isLegacy?: boolean; metricsSource?: "biomechanics_engine" | "legacy_simulation";

@@ -96,12 +96,21 @@ function dateLabel(value: unknown) {
 
 function AnalysisCurve({ analysis }: { analysis: RowingAnalysis }) {
   const cycles = analysis.cycles ?? [];
-  if (cycles.length < 2) {
+  const samples = analysis.cadenceTimeline?.length
+    ? analysis.cadenceTimeline
+    : cycles.map((cycle) => ({ time: cycle.startTime, value: cycle.strokeRate || 0 }));
+  const aggregateCadence = analysis.metrics?.strokeRate;
+  const plottedSamples = samples.length >= 2
+    ? samples
+    : aggregateCadence != null
+      ? [{ time: 0, value: aggregateCadence }, { time: analysis.durationSeconds ?? 1, value: aggregateCadence }]
+      : [];
+  if (plottedSamples.length < 2) {
     return <div className="analysis-no-series">Aucune série temporelle enregistrée pour cette analyse.</div>;
   }
-  const points = cycles.map((cycle, index) => {
-    const value = cycle.strokeRate || 0;
-    const x = (index / Math.max(cycles.length - 1, 1)) * 100;
+  const points = plottedSamples.map((sample, index) => {
+    const value = sample.value;
+    const x = (index / Math.max(plottedSamples.length - 1, 1)) * 100;
     const y = 92 - Math.min(Math.max(value, 0), 60) * 1.25;
     return `${x},${y}`;
   }).join(" ");
@@ -218,7 +227,7 @@ function Detail({ id }: { id: string }) {
                     )}
                   </section>
                   <section className="dynamic-curve-card">
-                    <div><h2>Courbe de cadence</h2><small>Données calculées cycle par cycle</small></div>
+                    <div><h2>Courbe de cadence</h2><small>{analysis.cadenceTimeline?.length ? "Données calculées cycle par cycle" : "Cadence moyenne enregistrée"}</small></div>
                     <AnalysisCurve analysis={analysis} />
                   </section>
                   <section className="cycle-phases-card">

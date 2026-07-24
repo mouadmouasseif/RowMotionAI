@@ -106,7 +106,9 @@ service cloud.firestore {
         || (isActive() && resource.data.createdBy == request.auth.uid
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
             "videoUrl", "storagePath", "videoStorageMode", "fileName",
-            "durationSeconds", "status", "progress", "updatedAt"
+            "durationSeconds", "status", "progress", "updatedAt",
+            "metrics", "technicalScore", "errors", "recommendations",
+            "metricsSource", "cadenceTimeline"
           ]));
       allow delete: if isSuperAdmin() || resource.data.createdBy == request.auth.uid
         || (isClubAdmin() && sameClub(resource.data.clubId));

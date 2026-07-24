@@ -1,5 +1,5 @@
 import { FilesetResolver, PoseLandmarker, type NormalizedLandmark } from "@mediapipe/tasks-vision";
-import type { AnalysisMetrics } from "@/types/analysis";
+import type { AnalysisMetrics, CadenceSample } from "@/types/analysis";
 
 export interface LocalPoseAnalysisResult {
   metrics: AnalysisMetrics;
@@ -7,6 +7,7 @@ export interface LocalPoseAnalysisResult {
   processedFrames: number;
   errors: string[];
   recommendations: string[];
+  cadenceTimeline: CadenceSample[];
 }
 
 let visionPromise: ReturnType<typeof FilesetResolver.forVisionTasks> | null = null;
@@ -143,11 +144,26 @@ export async function analyzeLocalVideo(
 
     let catches = 0;
     let belowThreshold = false;
+    const catchTimes: number[] = [];
     for (const sample of kneeTimeline) {
-      if (sample.value < 95 && !belowThreshold) { catches += 1; belowThreshold = true; }
+      if (sample.value < 95 && !belowThreshold) {
+        catches += 1;
+        catchTimes.push(sample.time);
+        belowThreshold = true;
+      }
       if (sample.value > 125) belowThreshold = false;
     }
     const strokeRate = duration >= 5 ? catches / duration * 60 : null;
+    const cadenceTimeline: CadenceSample[] = catchTimes.slice(1).map((time, index) => ({
+      time: Math.round(time * 100) / 100,
+      value: Math.round(60 / Math.max(time - catchTimes[index], 0.25) * 10) / 10,
+    })).filter((sample) => sample.value >= 8 && sample.value <= 60);
+    if (cadenceTimeline.length < 2 && strokeRate !== null) {
+      cadenceTimeline.splice(0, cadenceTimeline.length,
+        { time: 0, value: rounded(strokeRate) ?? strokeRate },
+        { time: Math.round(duration * 100) / 100, value: rounded(strokeRate) ?? strokeRate },
+      );
+    }
     const symmetryScore = average(symmetries);
     const confidence = detectedFrames / totalFrames;
     const technicalScore = Math.round(Math.max(0, Math.min(100, (symmetryScore ?? 60) * 0.65 + confidence * 35)));
@@ -176,7 +192,7 @@ export async function analyzeLocalVideo(
     }
     if ((metrics.strokeRate ?? 28) > 36) recommendations.push("Réduisez légèrement la cadence pour préserver la qualité technique.");
     if (!errors.length) recommendations.push("La posture détectée est régulière. Continuez à privilégier la fluidité du cycle.");
-    return { metrics, technicalScore, processedFrames: totalFrames, errors, recommendations };
+    return { metrics, technicalScore, processedFrames: totalFrames, errors, recommendations, cadenceTimeline };
   } finally {
     landmarker.close();
     video.removeAttribute("src");

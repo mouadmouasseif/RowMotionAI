@@ -99,6 +99,7 @@ function Content() {
         technicalScore: result.technicalScore,
         errors: result.errors,
         recommendations: result.recommendations,
+        cadenceTimeline: result.cadenceTimeline,
         metricsSource: "biomechanics_engine",
         progress: {
           status: "completed",
