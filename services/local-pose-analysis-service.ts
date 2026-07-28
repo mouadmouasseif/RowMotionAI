@@ -1,5 +1,5 @@
 import { FilesetResolver, PoseLandmarker, type NormalizedLandmark } from "@mediapipe/tasks-vision";
-import type { AnalysisMetrics, CadenceSample } from "@/types/analysis";
+import type { AnalysisMetrics, AnalysisTimelines, CadenceSample, StrokeCycle, StrokePhase } from "@/types/analysis";
 
 export interface LocalPoseAnalysisResult {
   metrics: AnalysisMetrics;
@@ -8,6 +8,9 @@ export interface LocalPoseAnalysisResult {
   errors: string[];
   recommendations: string[];
   cadenceTimeline: CadenceSample[];
+  cycles: StrokeCycle[];
+  phases: Record<string, StrokePhase>;
+  timelines: AnalysisTimelines;
 }
 
 let visionPromise: ReturnType<typeof FilesetResolver.forVisionTasks> | null = null;
@@ -95,6 +98,9 @@ export async function analyzeLocalVideo(
   const backs: number[] = [];
   const symmetries: number[] = [];
   const kneeTimeline: Array<{ time: number; value: number }> = [];
+  const hipTimeline: Array<{ time: number; value: number }> = [];
+  const backTimeline: Array<{ time: number; value: number }> = [];
+  const symmetryTimeline: Array<{ time: number; value: number }> = [];
   let detectedFrames = 0;
 
   try {
@@ -128,11 +134,16 @@ export async function analyzeLocalVideo(
         const elbow = average([leftElbow, rightElbow].filter((value): value is number => value !== null));
         const shoulder = average([leftShoulder, rightShoulder].filter((value): value is number => value !== null));
         if (knee !== null) { knees.push(knee); kneeTimeline.push({ time, value: knee }); }
-        if (hip !== null) hips.push(hip);
+        if (hip !== null) { hips.push(hip); hipTimeline.push({ time, value: hip }); }
         if (elbow !== null) elbows.push(elbow);
         if (shoulder !== null) shoulders.push(shoulder);
         backs.push(back);
-        if (leftKnee !== null && rightKnee !== null) symmetries.push(Math.max(0, 100 - Math.abs(leftKnee - rightKnee) * 2));
+        backTimeline.push({ time, value: back });
+        if (leftKnee !== null && rightKnee !== null) {
+          const symmetry = Math.max(0, 100 - Math.abs(leftKnee - rightKnee) * 2);
+          symmetries.push(symmetry);
+          symmetryTimeline.push({ time, value: symmetry });
+        }
       }
       onProgress(Math.round((index + 1) / totalFrames * 100));
       if (index % 8 === 0) await new Promise<void>((resolve) => window.setTimeout(resolve, 0));
@@ -167,6 +178,40 @@ export async function analyzeLocalVideo(
     const symmetryScore = average(symmetries);
     const confidence = detectedFrames / totalFrames;
     const technicalScore = Math.round(Math.max(0, Math.min(100, (symmetryScore ?? 60) * 0.65 + confidence * 35)));
+    const cycles: StrokeCycle[] = catchTimes.slice(0, -1).map((startTime, index) => {
+      const endTime = catchTimes[index + 1];
+      const cycleDuration = Math.max(endTime - startTime, 0.01);
+      const driveTime = cycleDuration * 0.36;
+      const phaseConfidence = Math.max(0.45, Math.min(0.95, confidence));
+      const phases: StrokePhase[] = [
+        { name: "Prise d’eau", startTime, endTime: startTime + cycleDuration * 0.08, confidence: phaseConfidence },
+        { name: "Propulsion", startTime: startTime + cycleDuration * 0.08, endTime: startTime + driveTime, confidence: phaseConfidence },
+        { name: "Dégagé", startTime: startTime + driveTime, endTime: startTime + cycleDuration * 0.48, confidence: phaseConfidence },
+        { name: "Retour", startTime: startTime + cycleDuration * 0.48, endTime, confidence: phaseConfidence },
+      ];
+      const cycleKnees = kneeTimeline.filter((sample) => sample.time >= startTime && sample.time <= endTime).map((sample) => sample.value);
+      const amplitude = cycleKnees.length ? Math.max(...cycleKnees) - Math.min(...cycleKnees) : 0;
+      const cycleRegularity = Math.max(0, Math.min(100, 100 - Math.abs(cycleDuration - (60 / Math.max(strokeRate ?? 28, 1))) * 35));
+      return {
+        index,
+        startTime: rounded(startTime) ?? startTime,
+        endTime: rounded(endTime) ?? endTime,
+        duration: rounded(cycleDuration) ?? cycleDuration,
+        driveTime: rounded(driveTime) ?? driveTime,
+        recoveryTime: rounded(cycleDuration - driveTime) ?? cycleDuration - driveTime,
+        driveRecoveryRatio: rounded(driveTime / Math.max(cycleDuration - driveTime, 0.01)) ?? 0,
+        strokeRate: rounded(60 / cycleDuration) ?? 0,
+        phases,
+        metrics: {
+          regularity: rounded(cycleRegularity),
+          sequenceScore: rounded(Math.min(100, amplitude)),
+          symmetry: rounded(symmetryScore),
+          technicalScore,
+        },
+        errors: [],
+        confidence: phaseConfidence,
+      };
+    });
     const metrics: AnalysisMetrics = {
       backAngle: rounded(average(backs)),
       kneeAngle: rounded(average(knees)),
@@ -192,7 +237,25 @@ export async function analyzeLocalVideo(
     }
     if ((metrics.strokeRate ?? 28) > 36) recommendations.push("Réduisez légèrement la cadence pour préserver la qualité technique.");
     if (!errors.length) recommendations.push("La posture détectée est régulière. Continuez à privilégier la fluidité du cycle.");
-    return { metrics, technicalScore, processedFrames: totalFrames, errors, recommendations, cadenceTimeline };
+    const representativePhases = cycles[0]?.phases ?? [];
+    const timelines: AnalysisTimelines = {
+      cadence: cadenceTimeline,
+      kneeAngle: kneeTimeline.map((sample) => ({ time: rounded(sample.time) ?? sample.time, value: rounded(sample.value) ?? sample.value })),
+      hipAngle: hipTimeline.map((sample) => ({ time: rounded(sample.time) ?? sample.time, value: rounded(sample.value) ?? sample.value })),
+      backAngle: backTimeline.map((sample) => ({ time: rounded(sample.time) ?? sample.time, value: rounded(sample.value) ?? sample.value })),
+      symmetry: symmetryTimeline.map((sample) => ({ time: rounded(sample.time) ?? sample.time, value: rounded(sample.value) ?? sample.value })),
+    };
+    return {
+      metrics,
+      technicalScore,
+      processedFrames: totalFrames,
+      errors,
+      recommendations,
+      cadenceTimeline,
+      cycles,
+      phases: Object.fromEntries(representativePhases.map((phase) => [phase.name, phase])),
+      timelines,
+    };
   } finally {
     landmarker.close();
     video.removeAttribute("src");

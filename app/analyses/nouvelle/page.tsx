@@ -11,7 +11,7 @@ import { createAnalysis, updateAnalysis } from "@/services/analysis-service";
 import { saveLocalAnalysisVideo } from "@/services/local-video-service";
 import { analyzeLocalVideo } from "@/services/local-pose-analysis-service";
 import { inspectAnalysisVideo, MAX_VIDEO_SIZE_MB } from "@/services/storage-service";
-import type { AnalysisEnvironment, AnalysisTrainingType } from "@/types/analysis";
+import type { AnalysisEnvironment, AnalysisScope } from "@/types/analysis";
 import type { UserProfile } from "@/types/user";
 
 function Content() {
@@ -22,7 +22,7 @@ function Content() {
     params.get("environment") === "ergometer" ? "ergometer" : "boat",
   );
   const [athlete, setAthlete] = useState<UserProfile | null>(null);
-  const [trainingType, setTrainingType] = useState<AnalysisTrainingType>("technique");
+  const [analysisScope, setAnalysisScope] = useState<AnalysisScope>("complete");
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState("");
   const [progress, setProgress] = useState(0);
@@ -68,7 +68,8 @@ function Content() {
         athleteId: athlete.uid,
         athleteName: `${athlete.firstName} ${athlete.lastName}`.trim(),
         environment,
-        trainingType,
+        trainingType: "technique",
+        analysisScope,
         sourceType: "video",
         profile,
         fileName: file.name,
@@ -100,6 +101,9 @@ function Content() {
         errors: result.errors,
         recommendations: result.recommendations,
         cadenceTimeline: result.cadenceTimeline,
+        cycles: result.cycles,
+        phases: result.phases,
+        timelines: result.timelines,
         metricsSource: "biomechanics_engine",
         progress: {
           status: "completed",
@@ -138,6 +142,10 @@ function Content() {
       <div className="notice-card">
         La vidéo restera stockée localement dans ce navigateur. Elle ne sera jamais envoyée vers Firebase.
       </div>
+      <div className="analysis-all-in-one-note">
+        <strong>Une seule vidéo, une analyse complète</strong>
+        <span>RowMotion analyse automatiquement les phases du coup, les angles, la technique, la cadence, la symétrie, les performances disponibles et la comparaison avec votre historique.</span>
+      </div>
       <div className="step-card">
         <span className="step-number">1</span>
         <h2>Athlète analysé</h2>
@@ -160,20 +168,14 @@ function Content() {
       </div>
       <div className="step-card">
         <span className="step-number">3</span>
-        <h2>Type d’entraînement</h2>
-        <div className="choice-grid">
-          {([
-            ["technique", "Technique"],
-            ["endurance", "Endurance"],
-            ["power", "Puissance"],
-            ["interval", "Intervalles"],
-            ["recovery", "Récupération"],
-            ["competition", "Compétition"],
-          ] as const).map(([value, label]) => (
-            <button key={value} className={trainingType === value ? "selected" : ""} onClick={() => setTrainingType(value)}>
-              <Dumbbell />{label}
-            </button>
-          ))}
+        <h2>Niveau de détail</h2>
+        <div className="analysis-scope-grid">
+          <button className={analysisScope === "general" ? "selected" : ""} onClick={() => setAnalysisScope("general")}>
+            <Dumbbell /><span><strong>Analyse générale</strong><small>Score, métriques clés, recommandations et cadence</small></span>
+          </button>
+          <button className={analysisScope === "complete" ? "selected" : ""} onClick={() => setAnalysisScope("complete")}>
+            <ShipWheel /><span><strong>Analyse complète</strong><small>Tous les calculs, phases, angles, comparaisons et graphiques</small></span>
+          </button>
         </div>
       </div>
       <div className="step-card">

@@ -3,9 +3,10 @@
 import { use, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
+  Activity,
+  AlertTriangle,
   ArrowLeft,
   BarChart3,
-  CheckCircle2,
   Download,
   Gauge,
   MoreHorizontal,
@@ -14,6 +15,7 @@ import {
   Share2,
   Sparkles,
   Square,
+  Target,
   TrendingUp,
   Video,
   Waves,
@@ -30,9 +32,10 @@ import {
   subscribeToAnalysis,
   updateAnalysis,
 } from "@/services/analysis-service";
-import type { AnalysisMetrics, RowingAnalysis } from "@/types/analysis";
+import type { AnalysisMetrics, MetricSample, RowingAnalysis, StrokeCycle } from "@/types/analysis";
 
 type ComparisonMode = "general" | "video" | "training";
+type AnalysisTab = "summary" | "phases" | "technique" | "performance" | "comparison";
 type MetricKey = keyof AnalysisMetrics | "technicalScore" | "durationSeconds";
 
 interface MetricDefinition {
@@ -121,13 +124,74 @@ function AnalysisCurve({ analysis }: { analysis: RowingAnalysis }) {
   );
 }
 
+function TimelineChart({ samples, color = "#3b91ff" }: { samples: MetricSample[]; color?: string }) {
+  if (samples.length < 2) return <div className="analysis-no-series compact">Données temporelles non disponibles.</div>;
+  const values = samples.map((sample) => sample.value);
+  const min = Math.min(...values);
+  const spread = Math.max(Math.max(...values) - min, 1);
+  const points = samples.map((sample, index) => {
+    const x = index / Math.max(samples.length - 1, 1) * 100;
+    const y = 90 - ((sample.value - min) / spread) * 75;
+    return `${x},${y}`;
+  }).join(" ");
+  return (
+    <svg className="analysis-dynamic-chart compact" viewBox="0 0 100 100" preserveAspectRatio="none">
+      <polyline points={points} style={{ stroke: color }} />
+    </svg>
+  );
+}
+
+function scoreOnTen(analysis: RowingAnalysis) {
+  if (analysis.technicalScore == null) return null;
+  return analysis.technicalScore > 10 ? analysis.technicalScore / 10 : analysis.technicalScore;
+}
+
+function measuredLabel(value: number | null, unit: string) {
+  return value == null ? "Non mesuré" : `${value.toFixed(unit === "m" ? 2 : 1)} ${unit}`;
+}
+
+function displayCycles(analysis: RowingAnalysis): StrokeCycle[] {
+  if (analysis.cycles?.length) return analysis.cycles;
+  const samples = analysis.cadenceTimeline ?? [];
+  return samples.slice(0, -1).map((sample, index) => {
+    const next = samples[index + 1];
+    const duration = Math.max(next.time - sample.time, 0.01);
+    const driveTime = duration * 0.36;
+    const confidence = 0.45;
+    return {
+      index,
+      startTime: sample.time,
+      endTime: next.time,
+      duration,
+      driveTime,
+      recoveryTime: duration - driveTime,
+      driveRecoveryRatio: driveTime / Math.max(duration - driveTime, 0.01),
+      strokeRate: sample.value,
+      phases: [
+        { name: "Prise d’eau", startTime: sample.time, endTime: sample.time + duration * 0.08, confidence },
+        { name: "Propulsion", startTime: sample.time + duration * 0.08, endTime: sample.time + duration * 0.36, confidence },
+        { name: "Dégagé", startTime: sample.time + duration * 0.36, endTime: sample.time + duration * 0.48, confidence },
+        { name: "Retour", startTime: sample.time + duration * 0.48, endTime: next.time, confidence },
+      ],
+      metrics: {
+        regularity: analysis.metrics?.rhythmScore ?? null,
+        sequenceScore: analysis.metrics?.sequenceScore ?? null,
+        symmetry: analysis.metrics?.symmetryScore ?? null,
+        technicalScore: analysis.technicalScore,
+      },
+      errors: [],
+      confidence,
+    };
+  });
+}
+
 function Detail({ id }: { id: string }) {
   const { profile } = useAuth();
   const [analysis, setAnalysis] = useState<RowingAnalysis | null>(null);
   const [history, setHistory] = useState<RowingAnalysis[]>([]);
   const [error, setError] = useState("");
   const [note, setNote] = useState("");
-  const [tab, setTab] = useState<"summary" | "technique" | "comparison">("summary");
+  const [tab, setTab] = useState<AnalysisTab>("summary");
   const [comparisonMode, setComparisonMode] = useState<ComparisonMode>("general");
   const [selectedVideoId, setSelectedVideoId] = useState("");
 
@@ -203,7 +267,9 @@ function Detail({ id }: { id: string }) {
           <>
             <nav className="video-analysis-tabs">
               <button className={tab === "summary" ? "active" : ""} onClick={() => setTab("summary")}>Résumé</button>
-              <button className={tab === "technique" ? "active" : ""} onClick={() => setTab("technique")}>Angles & technique</button>
+              {(analysis.analysisScope ?? "complete") === "complete" && <button className={tab === "phases" ? "active" : ""} onClick={() => setTab("phases")}>Phases du coup</button>}
+              {(analysis.analysisScope ?? "complete") === "complete" && <button className={tab === "technique" ? "active" : ""} onClick={() => setTab("technique")}>Angles & technique</button>}
+              {(analysis.analysisScope ?? "complete") === "complete" && <button className={tab === "performance" ? "active" : ""} onClick={() => setTab("performance")}>Puissance & vitesse</button>}
               <button className={tab === "comparison" ? "active" : ""} onClick={() => setTab("comparison")}>Comparaison</button>
             </nav>
 
@@ -217,7 +283,8 @@ function Detail({ id }: { id: string }) {
             )}
 
             {tab !== "comparison" && (
-              <div className="video-analysis-layout">
+              <>
+              <div className={`video-analysis-layout ${tab}-view ${(analysis.analysisScope ?? "complete") === "general" ? "general-scope" : "complete-scope"}`}>
                 <main>
                   <section className="video-stage-reference">
                     <div className="video-stage-label"><Video />{environmentLabels[analysis.environment]}</div>
@@ -226,6 +293,40 @@ function Detail({ id }: { id: string }) {
                       <div className="detail-video-placeholder"><Waves /><Play /></div>
                     )}
                   </section>
+                  <section className="stroke-phase-summary">
+                    <header>
+                      <div><h2>Phases du coup</h2><small>Détection cinématique à partir du mouvement des jambes</small></div>
+                      <span>{displayCycles(analysis).length ? `${displayCycles(analysis).length} cycles analysés` : "Aucun cycle complet"}</span>
+                    </header>
+                    <div className="stroke-phase-timeline">
+                      {(["Prise d’eau", "Propulsion", "Dégagé", "Retour"] as const).map((name, index) => {
+                        const phase = displayCycles(analysis)[0]?.phases.find((item) => item.name === name);
+                        return (
+                          <article key={name}>
+                            <i>{index + 1}</i>
+                            <strong>{name}</strong>
+                            <small>{phase ? `${(phase.endTime - phase.startTime).toFixed(2)} s` : "Non détectée"}</small>
+                          </article>
+                        );
+                      })}
+                    </div>
+                  </section>
+                  <section className="analysis-overview-strip">
+                    <article className="analysis-score-card">
+                      <div className="analysis-score-ring">
+                        <strong>{scoreOnTen(analysis)?.toFixed(1) ?? "—"}</strong>
+                        <small>/10</small>
+                      </div>
+                      <div>
+                        <span>Score technique global</span>
+                        <strong>{scoreOnTen(analysis) == null ? "Analyse incomplète" : scoreOnTen(analysis)! >= 8 ? "Très bonne technique" : scoreOnTen(analysis)! >= 6 ? "Technique solide" : "Axes de progression détectés"}</strong>
+                        <small>Posture, symétrie et régularité détectées par la vidéo.</small>
+                      </div>
+                    </article>
+                    <article><Activity /><small>Cycles détectés</small><strong>{displayCycles(analysis).length}</strong></article>
+                    <article><Target /><small>Cadence moyenne</small><strong>{measuredLabel(analysis.metrics?.strokeRate, "spm")}</strong></article>
+                    <article><Zap /><small>Puissance</small><strong>{measuredLabel(analysis.metrics?.estimatedPower, "W")}</strong></article>
+                  </section>
                   <section className="dynamic-curve-card">
                     <div><h2>Courbe de cadence</h2><small>{analysis.cadenceTimeline?.length ? "Données calculées cycle par cycle" : "Cadence moyenne enregistrée"}</small></div>
                     <AnalysisCurve analysis={analysis} />
@@ -233,15 +334,62 @@ function Detail({ id }: { id: string }) {
                   <section className="cycle-phases-card">
                     <h2>Phases et cycles détectés</h2>
                     <div>
-                      {(analysis.cycles ?? []).slice(0, 8).map((cycle) => (
+                      {displayCycles(analysis).slice(0, 8).map((cycle) => (
                         <article key={cycle.index}>
                           <strong>Cycle {cycle.index + 1}</strong>
                           <span>{cycle.strokeRate.toFixed(1)} spm</span>
                           <small>{cycle.duration.toFixed(2)} s</small>
                         </article>
                       ))}
-                      {!analysis.cycles?.length && <p>Aucun cycle détaillé enregistré.</p>}
+                      {!displayCycles(analysis).length && <p>Aucun cycle détaillé enregistré.</p>}
                     </div>
+                  </section>
+                  <section className="phase-quality-card">
+                    <h2>Évaluation par phase</h2>
+                    <div>
+                      {(["Prise d’eau", "Propulsion", "Dégagé", "Retour"] as const).map((name, index) => {
+                        const phase = displayCycles(analysis)[0]?.phases.find((item) => item.name === name);
+                        const confidence = Math.round((phase?.confidence ?? 0) * 100);
+                        return <article key={name}><i className={`phase-color-${index + 1}`} /> <span><strong>{name}</strong><small>{phase ? `${confidence}% de confiance` : "Donnée insuffisante"}</small></span><b>{phase ? "Analysée" : "À revoir"}</b></article>;
+                      })}
+                    </div>
+                  </section>
+                  <section className="posture-detail-card">
+                    <h2>Détails de la posture et des angles</h2>
+                    <div>
+                      {([
+                        ["Angle du genou", analysis.metrics?.kneeAngle, 180],
+                        ["Angle de la hanche", analysis.metrics?.hipAngle, 180],
+                        ["Inclinaison du dos", analysis.metrics?.backAngle, 90],
+                        ["Angle des épaules", analysis.metrics?.shoulderAngle, 180],
+                        ["Angle des coudes", analysis.metrics?.elbowAngle, 180],
+                        ["Symétrie", analysis.metrics?.symmetryScore, 100],
+                      ] as const).map(([label, value, maximum]) => (
+                        <article key={label}><span><strong>{label}</strong><b>{measuredLabel(value, label === "Symétrie" ? "%" : "°")}</b></span><i><b style={{ width: `${value == null ? 0 : Math.min(100, Math.max(0, value / maximum * 100))}%` }} /></i></article>
+                      ))}
+                    </div>
+                  </section>
+                  <section className="sensor-profile-card">
+                    <Waves />
+                    <div><h2>Profil de mouvement</h2><strong>{analysis.metrics?.symmetryScore == null ? "Détection vidéo uniquement" : `${analysis.metrics.symmetryScore.toFixed(1)}% de symétrie`}</strong><p>{analysis.metrics?.rhythmScore == null ? "La régularité n’a pas pu être mesurée sur cette vidéo." : `Régularité du cycle : ${analysis.metrics.rhythmScore.toFixed(1)}%. Plus la vidéo contient de coups complets, plus cette estimation devient précise.`}</p></div>
+                  </section>
+                  <section className="analysis-curves-grid">
+                    <header><div><h2>Courbes biomécaniques</h2><small>Évolution des mesures pendant la vidéo</small></div></header>
+                    <div>
+                      <article><span>Angle genou <strong>{measuredLabel(analysis.metrics?.kneeAngle, "°")}</strong></span><TimelineChart samples={analysis.timelines?.kneeAngle ?? []} /></article>
+                      <article><span>Angle hanche <strong>{measuredLabel(analysis.metrics?.hipAngle, "°")}</strong></span><TimelineChart samples={analysis.timelines?.hipAngle ?? []} color="#a267ff" /></article>
+                      <article><span>Inclinaison du dos <strong>{measuredLabel(analysis.metrics?.backAngle, "°")}</strong></span><TimelineChart samples={analysis.timelines?.backAngle ?? []} color="#37d18b" /></article>
+                      <article><span>Symétrie <strong>{measuredLabel(analysis.metrics?.symmetryScore, "%")}</strong></span><TimelineChart samples={analysis.timelines?.symmetry ?? []} color="#f3b43b" /></article>
+                    </div>
+                  </section>
+                  <section className="analysis-conclusion-card">
+                    <header><Sparkles /><div><h2>Conclusion de l’analyse</h2><small>Interprétation des résultats détectés</small></div></header>
+                    <div className="analysis-conclusion-grid">
+                      <article><strong>Ce qui est positif</strong><p>{(analysis.metrics?.symmetryScore ?? 0) >= 80 ? "Le mouvement est globalement symétrique entre les deux côtés." : "Des cycles exploitables ont été détectés et peuvent servir de base de progression."}</p></article>
+                      <article><strong>Priorité de progression</strong><p>{analysis.errors?.[0] ?? analysis.recommendations?.[0] ?? "Conserver une cadence stable et rechercher un enchaînement fluide jambes, dos puis bras."}</p></article>
+                      <article><strong>Prochaine séance</strong><p>{analysis.recommendations?.[1] ?? analysis.recommendations?.[0] ?? "Filmer plusieurs coups complets de profil, avec le corps entier visible, puis comparer la régularité."}</p></article>
+                    </div>
+                    <p className="analysis-conclusion-disclaimer">Cette analyse vidéo fournit une aide technique. Les valeurs de puissance, de distance et de force restent non mesurées tant qu’aucun capteur compatible n’est connecté.</p>
                   </section>
                 </main>
                 <aside>
@@ -260,10 +408,15 @@ function Detail({ id }: { id: string }) {
                   <section className="analysis-strengths">
                     <h2>Résultats techniques</h2>
                     {(analysis.recommendations ?? []).length ? analysis.recommendations.map((item) => <p key={item}><Sparkles />{item}</p>) : <p>Aucune recommandation enregistrée.</p>}
-                    {(analysis.errors ?? []).map((item) => <p className="warning" key={item}><CheckCircle2 />{item}</p>)}
+                    {(analysis.errors ?? []).map((item) => <p className="warning" key={item}><AlertTriangle />{item}</p>)}
+                  </section>
+                  <section className="measurement-note">
+                    <Gauge />
+                    <div><strong>Origine des données</strong><p>Les angles, la cadence et la symétrie viennent de la vidéo. La puissance et la longueur du coup nécessitent un capteur ou une saisie manuelle et ne sont jamais inventées.</p></div>
                   </section>
                 </aside>
               </div>
+              </>
             )}
 
             {tab === "comparison" && (

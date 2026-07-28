@@ -1,6 +1,7 @@
 export type AnalysisEnvironment = "boat" | "ergometer" | "beach_sprint";
 export type AnalysisSource = "video" | "live";
 export type AnalysisTrainingType = "technique" | "endurance" | "power" | "interval" | "recovery" | "competition";
+export type AnalysisScope = "general" | "complete";
 export type AnalysisStatus = "draft" | "uploading" | "uploaded" | "queued" | "processing" | "completed" | "failed" | "cancelled";
 export type AnalysisStep = "validation" | "upload" | "video_preprocessing" | "pose_detection" | "stroke_detection" | "metrics_calculation" | "recommendations" | "saving_results" | "completed";
 export type VideoStorageMode = "local" | "firebase" | "none";
@@ -34,6 +35,14 @@ export interface StrokeCycle {
   metrics: CycleMetrics; errors: TechniqueError[]; confidence: number;
 }
 export interface CadenceSample { time: number; value: number }
+export interface MetricSample { time: number; value: number }
+export interface AnalysisTimelines {
+  cadence: MetricSample[];
+  kneeAngle: MetricSample[];
+  hipAngle: MetricSample[];
+  backAngle: MetricSample[];
+  symmetry: MetricSample[];
+}
 export interface AnalysisJob {
   id: string; analysisId: string; status: "queued" | "processing" | "completed" | "failed" | "dead_letter";
   attempts: number; maxAttempts: number; lockedBy?: string; lockedAt?: unknown; heartbeatAt?: unknown;
@@ -47,8 +56,10 @@ export interface RowingAnalysis {
   durationSeconds: number | null; technicalScore: number | null; metrics: AnalysisMetrics;
   metricValues?: Record<string, MetricValue>; phases: Record<string, unknown>; cycles?: StrokeCycle[];
   cadenceTimeline?: CadenceSample[];
+  timelines?: AnalysisTimelines;
   errors: string[]; recommendations: string[]; coachComment: string | null;
   trainingType?: AnalysisTrainingType;
+  analysisScope?: AnalysisScope;
   isLegacy?: boolean; metricsSource?: "biomechanics_engine" | "legacy_simulation";
   createdAt?: unknown; updatedAt?: unknown;
 }
