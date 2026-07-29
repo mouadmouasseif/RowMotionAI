@@ -32,7 +32,7 @@ import {
   subscribeToAnalysis,
   updateAnalysis,
 } from "@/services/analysis-service";
-import type { AnalysisMetrics, MetricSample, RowingAnalysis, StrokeCycle } from "@/types/analysis";
+import type { AnalysisMetrics, MetricSample, MuscleUsage, RowingAnalysis, StrokeCycle } from "@/types/analysis";
 
 type ComparisonMode = "general" | "video" | "training";
 type AnalysisTab = "summary" | "phases" | "technique" | "performance" | "comparison";
@@ -150,6 +150,18 @@ function measuredLabel(value: number | null, unit: string) {
   return value == null ? "Non mesuré" : `${value.toFixed(unit === "m" ? 2 : 1)} ${unit}`;
 }
 
+function muscleUsageFor(analysis: RowingAnalysis): MuscleUsage {
+  if (analysis.muscleUsage) return analysis.muscleUsage;
+  const clamp = (value: number) => Math.round(Math.max(0, Math.min(100, value)));
+  return {
+    back: clamp(100 - Math.abs((analysis.metrics?.backAngle ?? 25) - 22) * 1.35),
+    legs: clamp(45 + (analysis.metrics?.sequenceScore ?? 60) * 0.5),
+    arms: clamp(40 + Math.abs((analysis.metrics?.elbowAngle ?? 120) - 90) * 0.45),
+    core: clamp((analysis.metrics?.symmetryScore ?? 60) * 0.58 + (analysis.metrics?.rhythmScore ?? 60) * 0.42),
+    shoulders: clamp(40 + Math.abs((analysis.metrics?.shoulderAngle ?? 70) - 45) * 0.55),
+  };
+}
+
 function PhaseSpeedChart({ analysis }: { analysis: RowingAnalysis }) {
   const recordedSpeed = analysis.timelines?.movementSpeed ?? [];
   const hipSamples = analysis.timelines?.hipAngle ?? [];
@@ -228,6 +240,7 @@ function Detail({ id }: { id: string }) {
   const [tab, setTab] = useState<AnalysisTab>("summary");
   const [comparisonMode, setComparisonMode] = useState<ComparisonMode>("general");
   const [selectedVideoId, setSelectedVideoId] = useState("");
+  const [actionMessage, setActionMessage] = useState("");
 
   useEffect(() => {
     if (!profile) return;
@@ -271,8 +284,39 @@ function Detail({ id }: { id: string }) {
 
   const share = async () => {
     const url = window.location.href;
-    if (navigator.share) await navigator.share({ title: "Analyse RowMotion AI", url });
-    else await navigator.clipboard.writeText(url);
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: title || "Analyse RowMotion AI", text: "Consultez cette analyse RowMotion AI", url });
+        setActionMessage("Analyse partagée.");
+      } else {
+        await navigator.clipboard.writeText(url);
+        setActionMessage("Lien copié.");
+      }
+    } catch (reason) {
+      if (reason instanceof DOMException && reason.name === "AbortError") return;
+      try {
+        const input = document.createElement("textarea");
+        input.value = url;
+        input.style.position = "fixed";
+        input.style.opacity = "0";
+        document.body.appendChild(input);
+        input.select();
+        document.execCommand("copy");
+        input.remove();
+        setActionMessage("Lien copié.");
+      } catch {
+        setActionMessage("Partage indisponible sur ce navigateur.");
+      }
+    }
+    window.setTimeout(() => setActionMessage(""), 2800);
+  };
+
+  const exportPdf = () => {
+    const cleanup = () => document.body.classList.remove("analysis-printing");
+    document.body.classList.add("analysis-printing");
+    window.addEventListener("afterprint", cleanup, { once: true });
+    window.print();
+    window.setTimeout(cleanup, 2000);
   };
 
   const title = analysis ? `Analyse vidéo – ${environmentLabels[analysis.environment]}` : "Analyse vidéo";
@@ -287,13 +331,14 @@ function Detail({ id }: { id: string }) {
       subtitle={subtitle}
       headerActions={
         <>
-          <button className="button ghost" onClick={() => window.print()}><Download />Exporter le rapport</button>
-          <button className="button ghost" onClick={() => void share()}><Share2 />Partager</button>
+          <button className="button ghost analysis-action-button analysis-export-action" onClick={exportPdf}><Download />Exporter PDF</button>
+          <button className="button ghost analysis-action-button analysis-share-action" onClick={() => void share()}><Share2 />Partager</button>
           <button className="reference-more" aria-label="Plus d’options"><MoreHorizontal /></button>
         </>
       }
     >
       <div className="video-analysis-reference">
+        {actionMessage && <div className="analysis-action-toast" role="status">{actionMessage}</div>}
         <Link className="detail-back" href="/analyses"><ArrowLeft />Retour aux analyses</Link>
         {error ? <div className="error-card">{error}</div> : !analysis ? (
           <div className="loading-card">Chargement…</div>
@@ -403,6 +448,19 @@ function Detail({ id }: { id: string }) {
                         <article key={label}><span><strong>{label}</strong><b>{measuredLabel(value, label === "Symétrie" ? "%" : "°")}</b></span><i><b style={{ width: `${value == null ? 0 : Math.min(100, Math.max(0, value / maximum * 100))}%` }} /></i></article>
                       ))}
                     </div>
+                  </section>
+                  <section className="muscle-usage-card">
+                    <header><Activity /><div><h2>Groupes musculaires</h2><small>Pourcentage d’utilisation estimé pour cette analyse</small></div></header>
+                    <div>
+                      {([
+                        ["Dos", muscleUsageFor(analysis).back],
+                        ["Jambes", muscleUsageFor(analysis).legs],
+                        ["Bras", muscleUsageFor(analysis).arms],
+                        ["Gainage", muscleUsageFor(analysis).core],
+                        ["Épaules", muscleUsageFor(analysis).shoulders],
+                      ] as const).map(([label, value]) => <article key={label}><span><strong>{label}</strong><b>{value}%</b></span><i><b style={{ width: `${value}%` }} /></i></article>)}
+                    </div>
+                    <p>Estimation biomécanique calculée depuis les amplitudes articulaires, la posture et la régularité. Une mesure physiologique exacte nécessite des capteurs EMG.</p>
                   </section>
                   <section className="sensor-profile-card">
                     <Waves />

@@ -104,6 +104,7 @@ function Content() {
         cycles: result.cycles,
         phases: result.phases,
         timelines: result.timelines,
+        muscleUsage: result.muscleUsage,
         metricsSource: "biomechanics_engine",
         progress: {
           status: "completed",

@@ -44,6 +44,13 @@ export interface AnalysisTimelines {
   backAngle: MetricSample[];
   symmetry: MetricSample[];
 }
+export interface MuscleUsage {
+  back: number;
+  legs: number;
+  arms: number;
+  core: number;
+  shoulders: number;
+}
 export interface AnalysisJob {
   id: string; analysisId: string; status: "queued" | "processing" | "completed" | "failed" | "dead_letter";
   attempts: number; maxAttempts: number; lockedBy?: string; lockedAt?: unknown; heartbeatAt?: unknown;
@@ -58,6 +65,7 @@ export interface RowingAnalysis {
   metricValues?: Record<string, MetricValue>; phases: Record<string, unknown>; cycles?: StrokeCycle[];
   cadenceTimeline?: CadenceSample[];
   timelines?: AnalysisTimelines;
+  muscleUsage?: MuscleUsage;
   errors: string[]; recommendations: string[]; coachComment: string | null;
   trainingType?: AnalysisTrainingType;
   analysisScope?: AnalysisScope;

@@ -1,5 +1,5 @@
 import { FilesetResolver, PoseLandmarker, type NormalizedLandmark } from "@mediapipe/tasks-vision";
-import type { AnalysisMetrics, AnalysisTimelines, CadenceSample, StrokeCycle, StrokePhase } from "@/types/analysis";
+import type { AnalysisMetrics, AnalysisTimelines, CadenceSample, MuscleUsage, StrokeCycle, StrokePhase } from "@/types/analysis";
 
 export interface LocalPoseAnalysisResult {
   metrics: AnalysisMetrics;
@@ -11,6 +11,7 @@ export interface LocalPoseAnalysisResult {
   cycles: StrokeCycle[];
   phases: Record<string, StrokePhase>;
   timelines: AnalysisTimelines;
+  muscleUsage: MuscleUsage;
 }
 
 let visionPromise: ReturnType<typeof FilesetResolver.forVisionTasks> | null = null;
@@ -50,6 +51,14 @@ function average(values: number[]) {
 
 function rounded(value: number | null) {
   return value === null ? null : Math.round(value * 10) / 10;
+}
+
+function range(values: number[]) {
+  return values.length ? Math.max(...values) - Math.min(...values) : 0;
+}
+
+function percent(value: number) {
+  return Math.round(Math.max(0, Math.min(100, value)));
 }
 
 function midpoint(a: NormalizedLandmark, b: NormalizedLandmark): NormalizedLandmark {
@@ -265,6 +274,13 @@ export async function analyzeLocalVideo(
       backAngle: backTimeline.map((sample) => ({ time: rounded(sample.time) ?? sample.time, value: rounded(sample.value) ?? sample.value })),
       symmetry: symmetryTimeline.map((sample) => ({ time: rounded(sample.time) ?? sample.time, value: rounded(sample.value) ?? sample.value })),
     };
+    const muscleUsage: MuscleUsage = {
+      back: percent(100 - Math.abs((metrics.backAngle ?? 25) - 22) * 1.35),
+      legs: percent(45 + range(knees) * 0.35 + range(hips) * 0.2),
+      arms: percent(35 + range(elbows) * 0.38 + range(shoulders) * 0.12),
+      core: percent((metrics.symmetryScore ?? 60) * 0.58 + (metrics.rhythmScore ?? 60) * 0.42),
+      shoulders: percent(35 + range(shoulders) * 0.55 + range(elbows) * 0.08),
+    };
     return {
       metrics,
       technicalScore,
@@ -275,6 +291,7 @@ export async function analyzeLocalVideo(
       cycles,
       phases: Object.fromEntries(representativePhases.map((phase) => [phase.name, phase])),
       timelines,
+      muscleUsage,
     };
   } finally {
     landmarker.close();
