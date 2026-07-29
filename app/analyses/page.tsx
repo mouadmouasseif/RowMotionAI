@@ -25,7 +25,14 @@ import { useAuth } from "@/providers/AuthProvider";
 import { listAnalyses, removeAnalysis } from "@/services/analysis-service";
 import type { RowingAnalysis } from "@/types/analysis";
 
-type AnalysisTab = "all" | "ergometer" | "boat" | "video" | "favorites";
+type AnalysisTab = "all" | RowingAnalysis["environment"] | "video" | "favorites";
+
+const environmentMeta: Record<RowingAnalysis["environment"], { label: string; description: string; water: boolean }> = {
+  ergometer: { label: "Ergomètre", description: "Travail d’endurance + technique", water: false },
+  boat: { label: "Sur l’eau", description: "Travail technique + départs", water: true },
+  double_scull: { label: "Bateau double", description: "Technique individuelle + synchronisation", water: true },
+  beach_sprint: { label: "Aviron Beach", description: "Départ, embarquement, sprint et retour plage", water: true },
+};
 
 const fallbackRows = [
   { title: "Séance du 18 Mai 2025", environment: "ergometer" as const, duration: "20:45", distance: "6,310 m", pace: "2:18.4", cadence: 28, power: 268, score: 8.7, date: "18 Mai 2025", ago: "Il y a 2 h" },
@@ -66,7 +73,7 @@ function AnalysesContent() {
     const realRows = items.map((item, index) => ({
       id: item.id,
       title: item.fileName || item.athleteName || `Analyse ${index + 1}`,
-      environment: item.environment === "boat" ? "boat" as const : "ergometer" as const,
+      environment: item.environment,
       duration: item.durationSeconds
         ? `${Math.floor(item.durationSeconds / 60)}:${String(Math.round(item.durationSeconds % 60)).padStart(2, "0")}`
         : "20:45",
@@ -89,6 +96,8 @@ function AnalysesContent() {
       tab === "all" ||
       (tab === "ergometer" && row.environment === "ergometer") ||
       (tab === "boat" && row.environment === "boat") ||
+      (tab === "double_scull" && row.environment === "double_scull") ||
+      (tab === "beach_sprint" && row.environment === "beach_sprint") ||
       (tab === "video" && Boolean(row.item)) ||
       (tab === "favorites" && favorites.has(row.id));
     return matchesSearch && matchesTab;
@@ -125,6 +134,8 @@ function AnalysesContent() {
               ["all", "Toutes", rows.length || 42],
               ["ergometer", "Ergomètre", rows.filter((row) => row.environment === "ergometer").length || 28],
               ["boat", "Sur l’eau", rows.filter((row) => row.environment === "boat").length || 14],
+              ["double_scull", "Bateau double", rows.filter((row) => row.environment === "double_scull").length],
+              ["beach_sprint", "Aviron Beach", rows.filter((row) => row.environment === "beach_sprint").length],
               ["video", "Vidéos importées", items.length || 24],
               ["favorites", "Favoris", favorites.size || 8],
             ].map(([value, label, count]) => (
@@ -151,11 +162,11 @@ function AnalysesContent() {
                     {row.item?.thumbnailUrl ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img src={row.item.thumbnailUrl} alt="" />
-                    ) : row.environment === "boat" ? <Waves /> : <FileVideo />}
+                    ) : environmentMeta[row.environment].water ? <Waves /> : <FileVideo />}
                     <time>▶{rowIndex % 2 ? "00:32" : "00:20"}</time>
                   </div>
-                  <div className="analysis-session"><strong>{row.title}</strong><small><Clock3 />{row.environment === "boat" ? "Sur l’eau" : "Ergomètre"} · {row.duration} · {row.distance}</small><p>{row.environment === "boat" ? "Travail technique + départs" : "Travail d’endurance + technique"}</p></div>
-                  <span className={`environment-pill ${row.environment}`}>{row.environment === "boat" ? <Waves /> : <FileVideo />}{row.environment === "boat" ? "Sur l’eau" : "Ergomètre"}</span>
+                  <div className="analysis-session"><strong>{row.title}</strong><small><Clock3 />{environmentMeta[row.environment].label} · {row.duration} · {row.distance}</small><p>{environmentMeta[row.environment].description}</p></div>
+                  <span className={`environment-pill ${row.environment}`}>{environmentMeta[row.environment].water ? <Waves /> : <FileVideo />}{environmentMeta[row.environment].label}</span>
                   <div className="analysis-key-metrics"><span><Timer /><strong>{row.pace}<i>/500m</i></strong><small>Allure moyenne</small></span><span><Gauge /><strong>{row.cadence}<i>spm</i></strong><small>Cadence moyenne</small></span><span><TrendingIcon /><strong>{row.power}<i>w</i></strong><small>Puissance moyenne</small></span></div>
                   <div className={`table-score ${row.score < 8 ? "medium" : ""}`}><strong>{row.score.toFixed(1)}<i>/10</i></strong><small>{scoreLabel(row.score)}</small></div>
                   <div className="analysis-date"><strong>{row.date}</strong><small>{row.ago}</small></div>

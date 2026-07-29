@@ -1,4 +1,4 @@
-export type AnalysisEnvironment = "boat" | "ergometer" | "beach_sprint";
+export type AnalysisEnvironment = "boat" | "double_scull" | "ergometer" | "beach_sprint";
 export type AnalysisSource = "video" | "live";
 export type AnalysisTrainingType = "technique" | "endurance" | "power" | "interval" | "recovery" | "competition";
 export type AnalysisScope = "general" | "complete";
@@ -51,6 +51,19 @@ export interface MuscleUsage {
   core: number;
   shoulders: number;
 }
+export interface CrewRowerResult {
+  position: 1 | 2;
+  detectedFrames: number;
+  confidence: number;
+  technicalScore: number | null;
+  metrics: Pick<AnalysisMetrics, "backAngle" | "kneeAngle" | "hipAngle" | "strokeRate" | "symmetryScore">;
+}
+export interface CrewAnalysisResult {
+  rowers: CrewRowerResult[];
+  synchronizationScore: number | null;
+  timingOffsetSeconds: number | null;
+  simultaneousDriveScore: number | null;
+}
 export interface AnalysisJob {
   id: string; analysisId: string; status: "queued" | "processing" | "completed" | "failed" | "dead_letter";
   attempts: number; maxAttempts: number; lockedBy?: string; lockedAt?: unknown; heartbeatAt?: unknown;
@@ -66,6 +79,7 @@ export interface RowingAnalysis {
   cadenceTimeline?: CadenceSample[];
   timelines?: AnalysisTimelines;
   muscleUsage?: MuscleUsage;
+  crewAnalysis?: CrewAnalysisResult;
   errors: string[]; recommendations: string[]; coachComment: string | null;
   trainingType?: AnalysisTrainingType;
   analysisScope?: AnalysisScope;

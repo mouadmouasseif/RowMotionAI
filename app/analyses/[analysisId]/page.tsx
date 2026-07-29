@@ -58,8 +58,9 @@ const metricDefinitions: MetricDefinition[] = [
 
 const environmentLabels: Record<RowingAnalysis["environment"], string> = {
   boat: "Sur l’eau",
+  double_scull: "Bateau double",
   ergometer: "Ergomètre",
-  beach_sprint: "Beach Sprint",
+  beach_sprint: "Aviron Beach / Beach Sprint",
 };
 const trainingLabels = {
   technique: "Technique",
@@ -462,6 +463,18 @@ function Detail({ id }: { id: string }) {
                     </div>
                     <p>Estimation biomécanique calculée depuis les amplitudes articulaires, la posture et la régularité. Une mesure physiologique exacte nécessite des capteurs EMG.</p>
                   </section>
+                  {analysis.environment === "double_scull" && <section className="crew-analysis-card">
+                    <header><Waves /><div><h2>Analyse du bateau double</h2><small>Résultats individuels et synchronisation de l’équipage</small></div></header>
+                    {analysis.crewAnalysis ? <>
+                      <div className="crew-rowers-grid">{analysis.crewAnalysis.rowers.map((rower) => <article key={rower.position}><span>Rameur {rower.position}</span><strong>{rower.technicalScore == null ? "—" : `${(rower.technicalScore / 10).toFixed(1)}/10`}</strong><small>Genou {measuredLabel(rower.metrics.kneeAngle, "°")}</small><small>Hanche {measuredLabel(rower.metrics.hipAngle, "°")}</small><small>Cadence {measuredLabel(rower.metrics.strokeRate, "spm")}</small><em>{Math.round(rower.confidence * 100)}% de détection</em></article>)}</div>
+                      <div className="crew-sync-grid"><article><span><strong>Synchronisation globale</strong><b>{analysis.crewAnalysis.synchronizationScore == null ? "—" : `${analysis.crewAnalysis.synchronizationScore}%`}</b></span><i><b style={{ width: `${analysis.crewAnalysis.synchronizationScore ?? 0}%` }} /></i></article><article><span><strong>Décalage moyen</strong><b>{analysis.crewAnalysis.timingOffsetSeconds == null ? "—" : `${analysis.crewAnalysis.timingOffsetSeconds.toFixed(2)} s`}</b></span><i><b style={{ width: `${analysis.crewAnalysis.simultaneousDriveScore ?? 0}%` }} /></i></article></div>
+                    </> : <p>Cette ancienne analyse ne contient pas les deux squelettes. Relancez l’analyse avec la discipline « Bateau double » et une vidéo où les deux rameurs sont entièrement visibles.</p>}
+                  </section>}
+                  {analysis.environment === "beach_sprint" && <section className="beach-analysis-card">
+                    <header><Target /><div><h2>Profil Aviron Beach</h2><small>Indicateurs adaptés au Beach Sprint</small></div></header>
+                    <div><article><small>Explosivité technique</small><strong>{measuredLabel(analysis.metrics?.sequenceScore, "%")}</strong></article><article><small>Stabilité / symétrie</small><strong>{measuredLabel(analysis.metrics?.symmetryScore, "%")}</strong></article><article><small>Cadence</small><strong>{measuredLabel(analysis.metrics?.strokeRate, "spm")}</strong></article><article><small>Régularité</small><strong>{measuredLabel(analysis.metrics?.rhythmScore, "%")}</strong></article></div>
+                    <p>L’analyse couvre la technique d’aviron visible. Les phases de course sur la plage, la mise à l’eau et la sortie nécessitent une vidéo montrant l’épreuve complète.</p>
+                  </section>}
                   <section className="sensor-profile-card">
                     <Waves />
                     <div><h2>Profil de mouvement</h2><strong>{analysis.metrics?.symmetryScore == null ? "Détection vidéo uniquement" : `${analysis.metrics.symmetryScore.toFixed(1)}% de symétrie`}</strong><p>{analysis.metrics?.rhythmScore == null ? "La régularité n’a pas pu être mesurée sur cette vidéo." : `Régularité du cycle : ${analysis.metrics.rhythmScore.toFixed(1)}%. Plus la vidéo contient de coups complets, plus cette estimation devient précise.`}</p></div>

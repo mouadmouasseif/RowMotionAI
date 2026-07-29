@@ -18,8 +18,11 @@ function Content() {
   const { profile } = useAuth();
   const router = useRouter();
   const params = useSearchParams();
+  const requestedEnvironment = params.get("environment");
   const [environment, setEnvironment] = useState<AnalysisEnvironment>(
-    params.get("environment") === "ergometer" ? "ergometer" : "boat",
+    requestedEnvironment === "ergometer" || requestedEnvironment === "double_scull" || requestedEnvironment === "beach_sprint"
+      ? requestedEnvironment
+      : "boat",
   );
   const [athlete, setAthlete] = useState<UserProfile | null>(null);
   const [analysisScope, setAnalysisScope] = useState<AnalysisScope>("complete");
@@ -93,7 +96,7 @@ function Content() {
       });
 
       setProgress(0);
-      const result = await analyzeLocalVideo(file, setProgress);
+      const result = await analyzeLocalVideo(file, setProgress, { environment });
       await updateAnalysis(id, {
         status: "completed",
         metrics: result.metrics,
@@ -105,6 +108,7 @@ function Content() {
         phases: result.phases,
         timelines: result.timelines,
         muscleUsage: result.muscleUsage,
+        crewAnalysis: result.crewAnalysis,
         metricsSource: "biomechanics_engine",
         progress: {
           status: "completed",
@@ -162,8 +166,11 @@ function Content() {
           <button className={environment === "ergometer" ? "selected" : ""} onClick={() => setEnvironment("ergometer")}>
             <Dumbbell />Ergomètre
           </button>
+          <button className={environment === "double_scull" ? "selected" : ""} onClick={() => setEnvironment("double_scull")}>
+            <ShipWheel />Bateau double
+          </button>
           <button className={environment === "beach_sprint" ? "selected" : ""} onClick={() => setEnvironment("beach_sprint")}>
-            <ShipWheel />Beach Sprint
+            <ShipWheel />Aviron Beach / Beach Sprint
           </button>
         </div>
       </div>

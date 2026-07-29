@@ -1,5 +1,5 @@
 import { FilesetResolver, PoseLandmarker, type NormalizedLandmark } from "@mediapipe/tasks-vision";
-import type { AnalysisMetrics, AnalysisTimelines, CadenceSample, MuscleUsage, StrokeCycle, StrokePhase } from "@/types/analysis";
+import type { AnalysisEnvironment, AnalysisMetrics, AnalysisTimelines, CadenceSample, CrewAnalysisResult, MuscleUsage, StrokeCycle, StrokePhase } from "@/types/analysis";
 
 export interface LocalPoseAnalysisResult {
   metrics: AnalysisMetrics;
@@ -12,11 +12,12 @@ export interface LocalPoseAnalysisResult {
   phases: Record<string, StrokePhase>;
   timelines: AnalysisTimelines;
   muscleUsage: MuscleUsage;
+  crewAnalysis?: CrewAnalysisResult;
 }
 
 let visionPromise: ReturnType<typeof FilesetResolver.forVisionTasks> | null = null;
 
-async function createLandmarker() {
+async function createLandmarker(numPoses = 1) {
   if (!visionPromise) {
     visionPromise = FilesetResolver.forVisionTasks(
       "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.35/wasm",
@@ -29,7 +30,7 @@ async function createLandmarker() {
   return PoseLandmarker.createFromOptions(vision, {
     baseOptions: { modelAssetPath: "/models/pose_landmarker_lite.task", delegate: "CPU" },
     runningMode: "VIDEO",
-    numPoses: 1,
+    numPoses,
     minPoseDetectionConfidence: 0.5,
     minPosePresenceConfidence: 0.5,
     minTrackingConfidence: 0.5,
@@ -90,9 +91,11 @@ async function seek(video: HTMLVideoElement, time: number) {
 export async function analyzeLocalVideo(
   file: File,
   onProgress: (progress: number) => void,
+  options: { environment?: AnalysisEnvironment } = {},
 ): Promise<LocalPoseAnalysisResult> {
   if (typeof window === "undefined") throw new Error("L’analyse locale nécessite un navigateur.");
-  const landmarker = await createLandmarker();
+  const isDouble = options.environment === "double_scull";
+  const landmarker = await createLandmarker(isDouble ? 2 : 1);
   const source = URL.createObjectURL(file);
   const video = document.createElement("video");
   video.muted = true;
@@ -114,6 +117,11 @@ export async function analyzeLocalVideo(
   let previousHipCenter: NormalizedLandmark | null = null;
   let previousPoseTime: number | null = null;
   let detectedFrames = 0;
+  const secondKnees: number[] = [];
+  const secondHips: number[] = [];
+  const secondBacks: number[] = [];
+  const secondKneeTimeline: Array<{ time: number; value: number }> = [];
+  let secondDetectedFrames = 0;
 
   try {
     await waitForMedia(video, "loadedmetadata");
@@ -162,6 +170,22 @@ export async function analyzeLocalVideo(
           symmetries.push(symmetry);
           symmetryTimeline.push({ time, value: symmetry });
         }
+      }
+      const secondPoints = result.landmarks[1];
+      if (isDouble && secondPoints?.length >= 29) {
+        secondDetectedFrames += 1;
+        const leftKnee = angle(secondPoints[23], secondPoints[25], secondPoints[27]);
+        const rightKnee = angle(secondPoints[24], secondPoints[26], secondPoints[28]);
+        const leftHip = angle(secondPoints[11], secondPoints[23], secondPoints[25]);
+        const rightHip = angle(secondPoints[12], secondPoints[24], secondPoints[26]);
+        const knee = average([leftKnee, rightKnee].filter((value): value is number => value !== null));
+        const hip = average([leftHip, rightHip].filter((value): value is number => value !== null));
+        const shoulderMid = midpoint(secondPoints[11], secondPoints[12]);
+        const hipMid = midpoint(secondPoints[23], secondPoints[24]);
+        const back = Math.abs(Math.atan2(shoulderMid.x - hipMid.x, hipMid.y - shoulderMid.y) * 180 / Math.PI);
+        if (knee !== null) { secondKnees.push(knee); secondKneeTimeline.push({ time, value: knee }); }
+        if (hip !== null) secondHips.push(hip);
+        secondBacks.push(back);
       }
       onProgress(Math.round((index + 1) / totalFrames * 100));
       if (index % 8 === 0) await new Promise<void>((resolve) => window.setTimeout(resolve, 0));
@@ -281,6 +305,30 @@ export async function analyzeLocalVideo(
       core: percent((metrics.symmetryScore ?? 60) * 0.58 + (metrics.rhythmScore ?? 60) * 0.42),
       shoulders: percent(35 + range(shoulders) * 0.55 + range(elbows) * 0.08),
     };
+    let crewAnalysis: CrewAnalysisResult | undefined;
+    if (isDouble) {
+      const secondCatchTimes: number[] = [];
+      let secondBelowThreshold = false;
+      for (const sample of secondKneeTimeline) {
+        if (sample.value < 95 && !secondBelowThreshold) { secondCatchTimes.push(sample.time); secondBelowThreshold = true; }
+        if (sample.value > 125) secondBelowThreshold = false;
+      }
+      const pairedCount = Math.min(catchTimes.length, secondCatchTimes.length);
+      const offsets = Array.from({ length: pairedCount }, (_, index) => Math.abs(catchTimes[index] - secondCatchTimes[index]));
+      const averageOffset = average(offsets);
+      const secondConfidence = secondDetectedFrames / totalFrames;
+      const secondStrokeRate = duration >= 5 ? secondCatchTimes.length / duration * 60 : null;
+      const secondScore = Math.round(Math.max(0, Math.min(100, secondConfidence * 55 + (average(secondKnees) ? 35 : 0) + (pairedCount ? 10 : 0))));
+      crewAnalysis = {
+        rowers: [
+          { position: 1, detectedFrames, confidence, technicalScore, metrics: { backAngle: metrics.backAngle, kneeAngle: metrics.kneeAngle, hipAngle: metrics.hipAngle, strokeRate: metrics.strokeRate, symmetryScore: metrics.symmetryScore } },
+          { position: 2, detectedFrames: secondDetectedFrames, confidence: rounded(secondConfidence) ?? 0, technicalScore: secondDetectedFrames ? secondScore : null, metrics: { backAngle: rounded(average(secondBacks)), kneeAngle: rounded(average(secondKnees)), hipAngle: rounded(average(secondHips)), strokeRate: rounded(secondStrokeRate), symmetryScore: null } },
+        ],
+        synchronizationScore: averageOffset === null ? null : percent(100 - averageOffset * 100),
+        timingOffsetSeconds: rounded(averageOffset),
+        simultaneousDriveScore: averageOffset === null ? null : percent(100 - averageOffset * 120),
+      };
+    }
     return {
       metrics,
       technicalScore,
@@ -292,6 +340,7 @@ export async function analyzeLocalVideo(
       phases: Object.fromEntries(representativePhases.map((phase) => [phase.name, phase])),
       timelines,
       muscleUsage,
+      crewAnalysis,
     };
   } finally {
     landmarker.close();
