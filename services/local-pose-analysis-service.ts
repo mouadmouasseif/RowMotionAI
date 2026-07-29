@@ -101,6 +101,9 @@ export async function analyzeLocalVideo(
   const hipTimeline: Array<{ time: number; value: number }> = [];
   const backTimeline: Array<{ time: number; value: number }> = [];
   const symmetryTimeline: Array<{ time: number; value: number }> = [];
+  const movementSpeedTimeline: Array<{ time: number; value: number }> = [];
+  let previousHipCenter: NormalizedLandmark | null = null;
+  let previousPoseTime: number | null = null;
   let detectedFrames = 0;
 
   try {
@@ -128,6 +131,12 @@ export async function analyzeLocalVideo(
         const rightShoulder = angle(points[14], points[12], points[24]);
         const shoulderMid = midpoint(points[11], points[12]);
         const hipMid = midpoint(points[23], points[24]);
+        if (previousHipCenter && previousPoseTime !== null && time > previousPoseTime) {
+          const displacement = Math.hypot(hipMid.x - previousHipCenter.x, hipMid.y - previousHipCenter.y);
+          movementSpeedTimeline.push({ time, value: displacement / (time - previousPoseTime) * 100 });
+        }
+        previousHipCenter = hipMid;
+        previousPoseTime = time;
         const back = Math.abs(Math.atan2(shoulderMid.x - hipMid.x, hipMid.y - shoulderMid.y) * 180 / Math.PI);
         const knee = average([leftKnee, rightKnee].filter((value): value is number => value !== null));
         const hip = average([leftHip, rightHip].filter((value): value is number => value !== null));
@@ -238,8 +247,19 @@ export async function analyzeLocalVideo(
     if ((metrics.strokeRate ?? 28) > 36) recommendations.push("Réduisez légèrement la cadence pour préserver la qualité technique.");
     if (!errors.length) recommendations.push("La posture détectée est régulière. Continuez à privilégier la fluidité du cycle.");
     const representativePhases = cycles[0]?.phases ?? [];
+    const halfSecondSpeed = Array.from(
+      movementSpeedTimeline.reduce((buckets, sample) => {
+        const bucket = Math.floor(sample.time / 0.5) * 0.5;
+        const values = buckets.get(bucket) ?? [];
+        values.push(sample.value);
+        buckets.set(bucket, values);
+        return buckets;
+      }, new Map<number, number[]>()),
+      ([time, values]) => ({ time: Math.round(time * 10) / 10, value: rounded(average(values)) ?? 0 }),
+    ).sort((a, b) => a.time - b.time);
     const timelines: AnalysisTimelines = {
       cadence: cadenceTimeline,
+      movementSpeed: halfSecondSpeed,
       kneeAngle: kneeTimeline.map((sample) => ({ time: rounded(sample.time) ?? sample.time, value: rounded(sample.value) ?? sample.value })),
       hipAngle: hipTimeline.map((sample) => ({ time: rounded(sample.time) ?? sample.time, value: rounded(sample.value) ?? sample.value })),
       backAngle: backTimeline.map((sample) => ({ time: rounded(sample.time) ?? sample.time, value: rounded(sample.value) ?? sample.value })),

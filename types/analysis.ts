@@ -38,6 +38,7 @@ export interface CadenceSample { time: number; value: number }
 export interface MetricSample { time: number; value: number }
 export interface AnalysisTimelines {
   cadence: MetricSample[];
+  movementSpeed: MetricSample[];
   kneeAngle: MetricSample[];
   hipAngle: MetricSample[];
   backAngle: MetricSample[];

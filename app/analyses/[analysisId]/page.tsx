@@ -150,6 +150,40 @@ function measuredLabel(value: number | null, unit: string) {
   return value == null ? "Non mesuré" : `${value.toFixed(unit === "m" ? 2 : 1)} ${unit}`;
 }
 
+function PhaseSpeedChart({ analysis }: { analysis: RowingAnalysis }) {
+  const recordedSpeed = analysis.timelines?.movementSpeed ?? [];
+  const hipSamples = analysis.timelines?.hipAngle ?? [];
+  const derivedSpeed = hipSamples.slice(1).map((sample, index) => ({
+    time: sample.time,
+    value: Math.abs(sample.value - hipSamples[index].value) / Math.max(sample.time - hipSamples[index].time, 0.01),
+  }));
+  const rawSamples = recordedSpeed.length ? recordedSpeed : derivedSpeed;
+  const samples = Array.from(rawSamples.reduce((buckets, sample) => {
+    const bucket = Math.floor(sample.time / 0.5) * 0.5;
+    const values = buckets.get(bucket) ?? [];
+    values.push(sample.value);
+    buckets.set(bucket, values);
+    return buckets;
+  }, new Map<number, number[]>()), ([time, values]) => ({ time, value: values.reduce((sum, value) => sum + value, 0) / values.length })).sort((a, b) => a.time - b.time);
+  const unit = recordedSpeed.length ? "%/s" : "°/s";
+  const cycles = displayCycles(analysis);
+  const phaseNames = ["Prise d’eau", "Propulsion", "Dégagé", "Retour"];
+  const averages = phaseNames.map((name) => {
+    const ranges = cycles.flatMap((cycle) => cycle.phases.filter((phase) => phase.name === name));
+    const values = samples.filter((sample) => ranges.some((range) => sample.time >= range.startTime && sample.time <= range.endTime)).map((sample) => sample.value);
+    return values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : null;
+  });
+  return (
+    <section className="movement-speed-card">
+      <header><div><h2>Vitesse gestuelle détaillée</h2><small>Déplacement du bassin mesuré toutes les 0,5 seconde</small></div><strong>{samples.length ? `${samples.length} mesures` : "Non disponible"}</strong></header>
+      <TimelineChart samples={samples} color="#20bff3" />
+      <div className="movement-speed-axis">{samples.slice(0, 16).map((sample) => <span key={sample.time}><b>{sample.value.toFixed(1)}</b><small>{sample.time.toFixed(1)} s</small></span>)}</div>
+      <div className="phase-speed-summary">{phaseNames.map((name, index) => <article key={name}><i className={`phase-color-${index + 1}`} /><span><strong>{name}</strong><small>Moyenne de tous les cycles</small></span><b>{averages[index] == null ? "—" : `${averages[index]!.toFixed(1)} ${unit}`}</b></article>)}</div>
+      <p>{recordedSpeed.length ? "Cette vitesse est relative à la taille de l’image (% du cadre par seconde)." : "Pour cette ancienne analyse, la vitesse est dérivée de la variation de l’angle de hanche (degrés par seconde)."} Une vitesse en km/h nécessite un capteur ou une distance de référence calibrée.</p>
+    </section>
+  );
+}
+
 function displayCycles(analysis: RowingAnalysis): StrokeCycle[] {
   if (analysis.cycles?.length) return analysis.cycles;
   const samples = analysis.cadenceTimeline ?? [];
@@ -331,6 +365,7 @@ function Detail({ id }: { id: string }) {
                     <div><h2>Courbe de cadence</h2><small>{analysis.cadenceTimeline?.length ? "Données calculées cycle par cycle" : "Cadence moyenne enregistrée"}</small></div>
                     <AnalysisCurve analysis={analysis} />
                   </section>
+                  <PhaseSpeedChart analysis={analysis} />
                   <section className="cycle-phases-card">
                     <h2>Phases et cycles détectés</h2>
                     <div>
