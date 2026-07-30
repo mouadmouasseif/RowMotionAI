@@ -42,6 +42,8 @@ export interface AnalysisTimelines {
   kneeAngle: MetricSample[];
   hipAngle: MetricSample[];
   backAngle: MetricSample[];
+  elbowAngle?: MetricSample[];
+  shoulderAngle?: MetricSample[];
   symmetry: MetricSample[];
 }
 export interface MuscleUsage {

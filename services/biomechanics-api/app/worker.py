@@ -13,5 +13,8 @@ def process_analysis(analysis_id:str):
         cancelled=lambda: ref.get().to_dict().get("status")=="cancelled"
         result=analyze_video(local,lambda done,total:update_progress(analysis_id,"pose_detection",5+round(80*done/max(total,1)),done,total),cancelled)
         update_progress(analysis_id,"saving_results",95)
-        ref.update({"status":"completed","progress":{"status":"completed","progress":100,"currentStep":"completed","processedFrames":result["sampleCount"],"totalFrames":result["sampleCount"],"completedAt":firestore.SERVER_TIMESTAMP},"metrics.kneeAngle":result["metrics"]["kneeAngle"],"metrics.hipAngle":result["metrics"]["hipAngle"],"metricsSource":"biomechanics_engine","durationSeconds":result["durationSeconds"],"updatedAt":firestore.SERVER_TIMESTAMP})
+        update={"status":"completed","progress":{"status":"completed","progress":100,"currentStep":"completed","processedFrames":result["sampleCount"],"totalFrames":result["sampleCount"],"completedAt":firestore.SERVER_TIMESTAMP},"metricsSource":"biomechanics_engine","durationSeconds":result["durationSeconds"],"updatedAt":firestore.SERVER_TIMESTAMP}
+        update.update({f"metrics.{key}":value for key,value in result["metrics"].items()})
+        update.update({f"timelines.{key}":value for key,value in result["timelines"].items()})
+        ref.update(update)
     return result

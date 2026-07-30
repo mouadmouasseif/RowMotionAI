@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { ProtectedPage } from "@/components/ProtectedPage";
+import { downloadReportsPdf } from "@/lib/report-pdf";
 import { useAuth } from "@/providers/AuthProvider";
 import { listAnalyses } from "@/services/analysis-service";
 import { listClubs } from "@/services/club-service";
@@ -105,6 +106,21 @@ function ReportsContent() {
     URL.revokeObjectURL(url);
   };
 
+  const exportPdf = async () => {
+    setError("");
+    try {
+      await downloadReportsPdf({
+        analyses,
+        clubs: clubs.filter((club) => club.active).length,
+        competitions: competitions.length,
+        athletes: athletes.length,
+        coaches: coaches.length,
+      });
+    } catch {
+      setError("Le fichier PDF n’a pas pu être généré. Réessayez dans un instant.");
+    }
+  };
+
   if (!profile) return null;
 
   const summary = [
@@ -185,7 +201,7 @@ function ReportsContent() {
             <section>
               <h2>Exporter rapidement</h2>
               <button onClick={exportCsv}><FileSpreadsheet /><span><strong>Export CSV</strong><small>Données réelles des analyses</small></span><Download /></button>
-              <button onClick={() => window.print()}><FileBarChart /><span><strong>Imprimer / PDF</strong><small>Vue synthétique actuelle</small></span><Download /></button>
+              <button onClick={() => void exportPdf()}><FileBarChart /><span><strong>Télécharger PDF</strong><small>Rapport synthétique complet</small></span><Download /></button>
             </section>
             <section>
               <h2>État des données</h2>

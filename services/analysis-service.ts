@@ -1,5 +1,6 @@
 import { addDoc, collection, deleteDoc, doc, getDoc, getDocs, limit, onSnapshot, orderBy, query, serverTimestamp, updateDoc, where } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
+import { normalizeAnalysis } from "@/lib/analysis/normalize-analysis";
 import { emptyAnalysisMetrics, initialAnalysisProgress, type AnalysisEnvironment, type AnalysisScope, type AnalysisSource, type AnalysisTrainingType, type RowingAnalysis } from "@/types/analysis";
 import type { UserProfile } from "@/types/user";
 
@@ -23,14 +24,14 @@ export async function listAnalyses(profile: UserProfile, max = 100): Promise<Row
     : profile.role === "coach" ? [where("coachId", "==", profile.uid), limit(max)]
     : [where("athleteId", "==", profile.uid), limit(max)];
   const snapshot = await getDocs(query(base, ...constraints));
-  return snapshot.docs.map((item) => ({ id: item.id, ...item.data() } as RowingAnalysis));
+  return snapshot.docs.map((item) => normalizeAnalysis({ id: item.id, ...item.data() } as RowingAnalysis));
 }
 
 export async function getAnalysis(id: string, profile: UserProfile): Promise<RowingAnalysis> {
   const { database } = requireFirebase();
   const snapshot = await getDoc(doc(database, "analyses", id));
   if (!snapshot.exists()) throw new Error("Analyse introuvable.");
-  const analysis = { id: snapshot.id, ...snapshot.data() } as RowingAnalysis;
+  const analysis = normalizeAnalysis({ id: snapshot.id, ...snapshot.data() } as RowingAnalysis);
   if (!canAccessAnalysis(profile, analysis)) throw new Error("Vous n’êtes pas autorisé à accéder à cette analyse.");
   return analysis;
 }
@@ -55,7 +56,7 @@ export function subscribeToAnalysis(id: string, profile: UserProfile, onValue: (
   const { database } = requireFirebase();
   return onSnapshot(doc(database, "analyses", id), (snapshot) => {
     if (!snapshot.exists()) { onError(new Error("Analyse introuvable.")); return; }
-    const analysis = { id: snapshot.id, ...snapshot.data() } as RowingAnalysis;
+    const analysis = normalizeAnalysis({ id: snapshot.id, ...snapshot.data() } as RowingAnalysis);
     if (!canAccessAnalysis(profile, analysis)) { onError(new Error("Accès non autorisé.")); return; }
     onValue(analysis);
   }, (reason) => onError(reason));

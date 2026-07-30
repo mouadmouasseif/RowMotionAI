@@ -112,6 +112,8 @@ export async function analyzeLocalVideo(
   const kneeTimeline: Array<{ time: number; value: number }> = [];
   const hipTimeline: Array<{ time: number; value: number }> = [];
   const backTimeline: Array<{ time: number; value: number }> = [];
+  const elbowTimeline: Array<{ time: number; value: number }> = [];
+  const shoulderTimeline: Array<{ time: number; value: number }> = [];
   const symmetryTimeline: Array<{ time: number; value: number }> = [];
   const movementSpeedTimeline: Array<{ time: number; value: number }> = [];
   let previousHipCenter: NormalizedLandmark | null = null;
@@ -161,8 +163,8 @@ export async function analyzeLocalVideo(
         const shoulder = average([leftShoulder, rightShoulder].filter((value): value is number => value !== null));
         if (knee !== null) { knees.push(knee); kneeTimeline.push({ time, value: knee }); }
         if (hip !== null) { hips.push(hip); hipTimeline.push({ time, value: hip }); }
-        if (elbow !== null) elbows.push(elbow);
-        if (shoulder !== null) shoulders.push(shoulder);
+        if (elbow !== null) { elbows.push(elbow); elbowTimeline.push({ time, value: elbow }); }
+        if (shoulder !== null) { shoulders.push(shoulder); shoulderTimeline.push({ time, value: shoulder }); }
         backs.push(back);
         backTimeline.push({ time, value: back });
         if (leftKnee !== null && rightKnee !== null) {
@@ -296,6 +298,8 @@ export async function analyzeLocalVideo(
       kneeAngle: kneeTimeline.map((sample) => ({ time: rounded(sample.time) ?? sample.time, value: rounded(sample.value) ?? sample.value })),
       hipAngle: hipTimeline.map((sample) => ({ time: rounded(sample.time) ?? sample.time, value: rounded(sample.value) ?? sample.value })),
       backAngle: backTimeline.map((sample) => ({ time: rounded(sample.time) ?? sample.time, value: rounded(sample.value) ?? sample.value })),
+      elbowAngle: elbowTimeline.map((sample) => ({ time: rounded(sample.time) ?? sample.time, value: rounded(sample.value) ?? sample.value })),
+      shoulderAngle: shoulderTimeline.map((sample) => ({ time: rounded(sample.time) ?? sample.time, value: rounded(sample.value) ?? sample.value })),
       symmetry: symmetryTimeline.map((sample) => ({ time: rounded(sample.time) ?? sample.time, value: rounded(sample.value) ?? sample.value })),
     };
     const muscleUsage: MuscleUsage = {

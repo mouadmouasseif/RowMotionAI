@@ -10,7 +10,6 @@ import {
   Download,
   Gauge,
   MoreHorizontal,
-  Play,
   RotateCcw,
   Share2,
   Sparkles,
@@ -24,10 +23,12 @@ import {
 import { AnalysisVideoSource } from "@/components/AnalysisVideoSource";
 import { AppShell } from "@/components/AppShell";
 import { ProtectedPage } from "@/components/ProtectedPage";
+import { downloadAnalysisPdf } from "@/lib/report-pdf";
 import { useAuth } from "@/providers/AuthProvider";
 import {
   cancelAnalysis,
   listAnalyses,
+  queueAnalysis,
   retryAnalysis,
   subscribeToAnalysis,
   updateAnalysis,
@@ -312,12 +313,27 @@ function Detail({ id }: { id: string }) {
     window.setTimeout(() => setActionMessage(""), 2800);
   };
 
-  const exportPdf = () => {
-    const cleanup = () => document.body.classList.remove("analysis-printing");
-    document.body.classList.add("analysis-printing");
-    window.addEventListener("afterprint", cleanup, { once: true });
-    window.print();
-    window.setTimeout(cleanup, 2000);
+  const exportPdf = async () => {
+    if (!analysis) return;
+    setActionMessage("Préparation du fichier PDF…");
+    try {
+      await downloadAnalysisPdf(analysis);
+      setActionMessage("Le rapport PDF a été téléchargé.");
+    } catch {
+      setActionMessage("Impossible de générer le PDF pour le moment.");
+    }
+    window.setTimeout(() => setActionMessage(""), 3200);
+  };
+
+  const recalculateAngles = async () => {
+    setActionMessage("Nouvelle mesure des angles en cours…");
+    try {
+      await queueAnalysis(id);
+      setActionMessage("L’analyse biomécanique a été relancée.");
+    } catch (reason) {
+      setActionMessage(reason instanceof Error ? reason.message : "Impossible de relancer la mesure des angles.");
+    }
+    window.setTimeout(() => setActionMessage(""), 3200);
   };
 
   const title = analysis ? `Analyse vidéo – ${environmentLabels[analysis.environment]}` : "Analyse vidéo";
@@ -369,9 +385,6 @@ function Detail({ id }: { id: string }) {
                   <section className="video-stage-reference">
                     <div className="video-stage-label"><Video />{environmentLabels[analysis.environment]}</div>
                     <AnalysisVideoSource analysis={analysis} />
-                    {!analysis.videoUrl && analysis.videoStorageMode !== "local" && (
-                      <div className="detail-video-placeholder"><Waves /><Play /></div>
-                    )}
                   </section>
                   <section className="stroke-phase-summary">
                     <header>
@@ -436,7 +449,12 @@ function Detail({ id }: { id: string }) {
                     </div>
                   </section>
                   <section className="posture-detail-card">
-                    <h2>Détails de la posture et des angles</h2>
+                    <header>
+                      <h2>Détails de la posture et des angles</h2>
+                      {analysis.videoStorageMode === "firebase" && [analysis.metrics?.kneeAngle, analysis.metrics?.hipAngle, analysis.metrics?.backAngle, analysis.metrics?.elbowAngle, analysis.metrics?.shoulderAngle].some((value) => value == null) && (
+                        <button type="button" onClick={() => void recalculateAngles()}><RotateCcw />Recalculer les angles</button>
+                      )}
+                    </header>
                     <div>
                       {([
                         ["Angle du genou", analysis.metrics?.kneeAngle, 180],
@@ -485,6 +503,8 @@ function Detail({ id }: { id: string }) {
                       <article><span>Angle genou <strong>{measuredLabel(analysis.metrics?.kneeAngle, "°")}</strong></span><TimelineChart samples={analysis.timelines?.kneeAngle ?? []} /></article>
                       <article><span>Angle hanche <strong>{measuredLabel(analysis.metrics?.hipAngle, "°")}</strong></span><TimelineChart samples={analysis.timelines?.hipAngle ?? []} color="#a267ff" /></article>
                       <article><span>Inclinaison du dos <strong>{measuredLabel(analysis.metrics?.backAngle, "°")}</strong></span><TimelineChart samples={analysis.timelines?.backAngle ?? []} color="#37d18b" /></article>
+                      <article><span>Angle des coudes <strong>{measuredLabel(analysis.metrics?.elbowAngle, "°")}</strong></span><TimelineChart samples={analysis.timelines?.elbowAngle ?? []} color="#f05f9e" /></article>
+                      <article><span>Angle des épaules <strong>{measuredLabel(analysis.metrics?.shoulderAngle, "°")}</strong></span><TimelineChart samples={analysis.timelines?.shoulderAngle ?? []} color="#20bff3" /></article>
                       <article><span>Symétrie <strong>{measuredLabel(analysis.metrics?.symmetryScore, "%")}</strong></span><TimelineChart samples={analysis.timelines?.symmetry ?? []} color="#f3b43b" /></article>
                     </div>
                   </section>
