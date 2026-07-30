@@ -13,11 +13,13 @@ import {
   Pencil,
   Plus,
   Search,
+  Trash2,
   Users,
 } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { ProtectedPage } from "@/components/ProtectedPage";
 import { useAuth } from "@/providers/AuthProvider";
+import { deleteManagedClub } from "@/services/admin-management-service";
 import { createClub, listClubs } from "@/services/club-service";
 import {
   uploadClubLogo,
@@ -31,6 +33,7 @@ function ClubsContent() {
   const [showForm, setShowForm] = useState(false);
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [error, setError] = useState("");
+  const [message, setMessage] = useState("");
   const [search, setSearch] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const submitLockRef = useRef(false);
@@ -76,6 +79,25 @@ function ClubsContent() {
     } finally {
       submitLockRef.current = false;
       setIsSubmitting(false);
+    }
+  };
+
+  const removeClub = async (club: Club) => {
+    if (
+      !window.confirm(
+        `Supprimer définitivement ${club.name} ? Les membres seront conservés sans club.`,
+      )
+    ) {
+      return;
+    }
+    try {
+      setError("");
+      setMessage("");
+      await deleteManagedClub(club.id);
+      setClubs((current) => current.filter((item) => item.id !== club.id));
+      setMessage("Club supprimé. Ses membres ont été désaffectés.");
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Suppression impossible.");
     }
   };
 
@@ -183,6 +205,7 @@ function ClubsContent() {
           </form>
         )}
         {error && <div className="error-card">{error}</div>}
+        {message && <div className="notice-card">{message}</div>}
         <div className="directory-layout clubs-layout">
           <main>
             <div className="directory-filters">
@@ -258,6 +281,13 @@ function ClubsContent() {
                     <Link href={`/clubs/${club.id}`}>
                       <Pencil />
                     </Link>
+                    <button
+                      className="danger"
+                      aria-label={`Supprimer ${club.name}`}
+                      onClick={() => void removeClub(club)}
+                    >
+                      <Trash2 />
+                    </button>
                   </span>
                 </article>
               ))}

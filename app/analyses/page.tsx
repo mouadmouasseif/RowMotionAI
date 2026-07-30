@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { ProtectedPage } from "@/components/ProtectedPage";
+import { toDate } from "@/lib/user-profile";
 import { useAuth } from "@/providers/AuthProvider";
 import { listAnalyses, removeAnalysis } from "@/services/analysis-service";
 import type { RowingAnalysis } from "@/types/analysis";
@@ -34,14 +35,35 @@ const environmentMeta: Record<RowingAnalysis["environment"], { label: string; de
   beach_sprint: { label: "Aviron Beach", description: "Départ, embarquement, sprint et retour plage", water: true },
 };
 
+function dateDaysAgo(days: number) {
+  const date = new Date();
+  date.setDate(date.getDate() - days);
+  return date.toLocaleDateString("fr-FR", {
+    day: "2-digit",
+    month: "long",
+    year: "numeric",
+  });
+}
+
+function formatAnalysisDate(value: unknown) {
+  const date = toDate(value);
+  return date
+    ? date.toLocaleDateString("fr-FR", {
+        day: "2-digit",
+        month: "long",
+        year: "numeric",
+      })
+    : dateDaysAgo(0);
+}
+
 const fallbackRows = [
-  { title: "Séance du 18 Mai 2025", environment: "ergometer" as const, duration: "20:45", distance: "6,310 m", pace: "2:18.4", cadence: 28, power: 268, score: 8.7, date: "18 Mai 2025", ago: "Il y a 2 h" },
-  { title: "Sortie Lac - Technique", environment: "boat" as const, duration: "32:15", distance: "8,250 m", pace: "2:05", cadence: 24, power: 256, score: 8.3, date: "17 Mai 2025", ago: "Il y a 1 jour" },
-  { title: "Intervalles 6x500m", environment: "ergometer" as const, duration: "18:30", distance: "5,000 m", pace: "1:52.6", cadence: 30, power: 312, score: 9.2, date: "16 Mai 2025", ago: "Il y a 2 jours" },
-  { title: "Sortie Longue Distance", environment: "boat" as const, duration: "28:10", distance: "10,230 m", pace: "2:16.8", cadence: 26, power: 220, score: 7.8, date: "15 Mai 2025", ago: "Il y a 3 jours" },
-  { title: "Technique & Posture", environment: "ergometer" as const, duration: "22:10", distance: "6,000 m", pace: "2:24.1", cadence: 27, power: 198, score: 7.1, date: "13 Mai 2025", ago: "Il y a 5 jours" },
-  { title: "Travail de départs", environment: "boat" as const, duration: "35:40", distance: "7,500 m", pace: "2:01.5", cadence: 25, power: 278, score: 8.8, date: "11 Mai 2025", ago: "Il y a 1 semaine" },
-  { title: "Test 2K", environment: "ergometer" as const, duration: "15:02", distance: "2,000 m", pace: "1:45.3", cadence: 32, power: 340, score: 9.4, date: "9 Mai 2025", ago: "Il y a 1 semaine" },
+  { title: `Séance du ${dateDaysAgo(0)}`, environment: "ergometer" as const, duration: "20:45", distance: "6,310 m", pace: "2:18.4", cadence: 28, power: 268, score: 8.7, date: dateDaysAgo(0), ago: "Aujourd’hui" },
+  { title: "Sortie Lac - Technique", environment: "boat" as const, duration: "32:15", distance: "8,250 m", pace: "2:05", cadence: 24, power: 256, score: 8.3, date: dateDaysAgo(1), ago: "Hier" },
+  { title: "Intervalles 6x500m", environment: "ergometer" as const, duration: "18:30", distance: "5,000 m", pace: "1:52.6", cadence: 30, power: 312, score: 9.2, date: dateDaysAgo(2), ago: "Il y a 2 jours" },
+  { title: "Sortie Longue Distance", environment: "boat" as const, duration: "28:10", distance: "10,230 m", pace: "2:16.8", cadence: 26, power: 220, score: 7.8, date: dateDaysAgo(3), ago: "Il y a 3 jours" },
+  { title: "Technique & Posture", environment: "ergometer" as const, duration: "22:10", distance: "6,000 m", pace: "2:24.1", cadence: 27, power: 198, score: 7.1, date: dateDaysAgo(5), ago: "Il y a 5 jours" },
+  { title: "Travail de départs", environment: "boat" as const, duration: "35:40", distance: "7,500 m", pace: "2:01.5", cadence: 25, power: 278, score: 8.8, date: dateDaysAgo(7), ago: "Il y a 1 semaine" },
+  { title: "Test 2K", environment: "ergometer" as const, duration: "15:02", distance: "2,000 m", pace: "1:45.3", cadence: 32, power: 340, score: 9.4, date: dateDaysAgo(8), ago: "Il y a 1 semaine" },
 ];
 
 function scoreLabel(score: number) {
@@ -82,7 +104,7 @@ function AnalysesContent() {
       cadence: item.metrics?.strokeRate ?? 28,
       power: item.metrics?.estimatedPower ?? 268,
       score: item.technicalScore ? item.technicalScore / 10 : 8.2,
-      date: "18 Mai 2025",
+      date: formatAnalysisDate(item.createdAt),
       ago: item.status === "completed" ? "Terminée" : item.status,
       item,
     }));

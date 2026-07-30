@@ -106,6 +106,11 @@ export function DashboardView() {
   if (!profile) return null;
 
   const firstName = profile.firstName || "Alex";
+  const todayLabel = new Date().toLocaleDateString("fr-FR", {
+    day: "2-digit",
+    month: "long",
+    year: "numeric",
+  });
   const statCards = [
     { icon: Activity, label: "Analyses totales", value: analyses.length || 42, unit: "", trend: "15%" },
     { icon: Waves, label: "Distance totale", value: "1,248", unit: "km", trend: "8%" },
@@ -150,7 +155,7 @@ export function DashboardView() {
                 <time>{latest?.durationSeconds ? `${Math.floor(latest.durationSeconds / 60)}:${String(Math.round(latest.durationSeconds % 60)).padStart(2, "0")}` : "00:20"}</time>
               </div>
               <div className="latest-copy">
-                <strong>{latest?.fileName || "Séance du 18 Mai 2025"}</strong>
+                <strong>{latest?.fileName || `Séance du ${todayLabel}`}</strong>
                 <small>{formatEnvironment(latest?.environment)} · 1h 02m · 6,310 m</small>
                 <p>Durée : 20:45 <b>·</b> Distance : 6,310 m</p>
                 <span>Score technique</span>
@@ -208,9 +213,9 @@ export function DashboardView() {
 
           <article className="reference-card best-card">
             <h2>Meilleures performances</h2>
-            <div><Medal /><span><strong>6,310 <i>m</i></strong><small>Ergomètre · 18 Mai 2025</small></span><em>Nouveau record</em></div>
-            <div><Medal /><span><strong>2:18.4 <i>/500m</i></strong><small>Ergomètre · 10 Mai 2025</small></span></div>
-            <div><Medal /><span><strong>1,024 <i>w</i></strong><small>Puissance max · 12 Mai 2025</small></span></div>
+            <div><Medal /><span><strong>6,310 <i>m</i></strong><small>Ergomètre · {todayLabel}</small></span><em>Nouveau record</em></div>
+            <div><Medal /><span><strong>2:18.4 <i>/500m</i></strong><small>Ergomètre · {todayLabel}</small></span></div>
+            <div><Medal /><span><strong>1,024 <i>w</i></strong><small>Puissance max · {todayLabel}</small></span></div>
           </article>
 
           <article className="reference-card heart-card">
@@ -223,9 +228,9 @@ export function DashboardView() {
           <article className="reference-card activity-card">
             <h2>Activité récente</h2>
             {[
-              [Clock3, "Analyse terminée", "Séance du 18 Mai 2025", "Il y a 2 h", "Score 8.7"],
+              [Clock3, "Analyse terminée", `Séance du ${todayLabel}`, "Aujourd’hui", "Score 8.7"],
               [TrendingUp, "Nouvelle performance", "6,310 m sur ergomètre", "Il y a 1 jour", "Record"],
-              [CalendarDays, "Plan d’entraînement", "Endurance Fondamentale", "Il y a 2 jours", "75% complété"],
+              [CalendarDays, "Plan d’entraînement", "Endurance Fondamentale", "Réinitialisé aujourd’hui", "0% complété"],
               [Scale, "Poids enregistré", "84.2 kg", "Il y a 2 jours", "-0.3 kg"],
             ].map(([Icon, title, sub, time, result]) => (
               <div key={String(title)}><span><Icon /></span><p><strong>{String(title)}</strong><small>{String(sub)}</small></p><time>{String(time)}<em>{String(result)}</em></time></div>
@@ -234,11 +239,11 @@ export function DashboardView() {
           </article>
 
           <article className="reference-card plan-card">
-            <div className="reference-card-title"><h2>Plan d’entraînement actuel</h2><em>Semaine 3/8</em></div>
+            <div className="reference-card-title"><h2>Plan d’entraînement actuel</h2><em>Semaine 1/8</em></div>
             <strong>Endurance Fondamentale</strong>
-            <small>75% complété</small>
-            <div className="plan-progress"><i /></div>
-            <span>75 min</span>
+            <small>0% complété</small>
+            <div className="plan-progress"><i style={{ width: "0%" }} /></div>
+            <span>0 min</span>
             <div className="next-session">
               <small>Prochaine séance</small>
               <strong><CalendarDays /> Demain · 10:00 <b>·</b> <Radio /> Ergomètre</strong>
@@ -263,7 +268,7 @@ export function DashboardView() {
           <article className="reference-card notifications-card">
             <div className="reference-card-title"><h2>Notifications</h2><Link href="/notifications">Tout marquer comme lu</Link></div>
             {[
-              [FileVideo, "Votre analyse est prête", "Séance du 18 Mai 2025", "Il y a 2 h"],
+              [FileVideo, "Votre analyse est prête", `Séance du ${todayLabel}`, "Aujourd’hui"],
               [Bell, "Rappel d’entraînement", "Votre séance de demain à 10:00", "Il y a 4 h"],
               [Sparkles, "Nouveau conseil", "3 conseils techniques disponibles", "Il y a 1 jour"],
               [Clock3, "Mise à jour", "Une nouvelle fonctionnalité est disponible", "Il y a 2 jours"],
