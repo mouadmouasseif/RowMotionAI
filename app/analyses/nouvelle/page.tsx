@@ -11,8 +11,24 @@ import { createAnalysis, updateAnalysis } from "@/services/analysis-service";
 import { saveLocalAnalysisVideo } from "@/services/local-video-service";
 import { analyzeLocalVideo } from "@/services/local-pose-analysis-service";
 import { inspectAnalysisVideo, MAX_VIDEO_SIZE_MB } from "@/services/storage-service";
-import type { AnalysisEnvironment, AnalysisScope } from "@/types/analysis";
+import type { AnalysisDistanceType, AnalysisEnvironment, AnalysisScope } from "@/types/analysis";
 import type { UserProfile } from "@/types/user";
+
+const analysisTypeOptions: { value: AnalysisDistanceType; label: string; meters?: number }[] = [
+  { value: "free_technique", label: "Technique libre" },
+  { value: "250m", label: "250 m", meters: 250 },
+  { value: "500m", label: "500 m", meters: 500 },
+  { value: "750m", label: "750 m", meters: 750 },
+  { value: "1000m", label: "1000 m", meters: 1000 },
+  { value: "1500m", label: "1500 m", meters: 1500 },
+  { value: "2000m", label: "2000 m", meters: 2000 },
+  { value: "5000m", label: "5000 m", meters: 5000 },
+  { value: "6000m", label: "6000 m", meters: 6000 },
+  { value: "custom", label: "Distance personnalisee" },
+  { value: "ergometer_test", label: "Test ergometre" },
+  { value: "training", label: "Entrainement" },
+  { value: "competition", label: "Competition" },
+];
 
 function Content() {
   const { profile } = useAuth();
@@ -26,6 +42,8 @@ function Content() {
   );
   const [athlete, setAthlete] = useState<UserProfile | null>(null);
   const [analysisScope, setAnalysisScope] = useState<AnalysisScope>("complete");
+  const [analysisType, setAnalysisType] = useState<AnalysisDistanceType>("free_technique");
+  const [customDistance, setCustomDistance] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState("");
   const [progress, setProgress] = useState(0);
@@ -67,12 +85,16 @@ function Content() {
 
     try {
       const metadata = await inspectAnalysisVideo(file);
+      const optionDistance = analysisTypeOptions.find((item) => item.value === analysisType)?.meters;
+      const selectedDistance = optionDistance ?? (analysisType === "custom" ? Number(customDistance) : null);
       const id = await createAnalysis({
         athleteId: athlete.uid,
         athleteName: `${athlete.firstName} ${athlete.lastName}`.trim(),
         environment,
         trainingType: "technique",
         analysisScope,
+        analysisType,
+        distance: Number.isFinite(selectedDistance) && selectedDistance ? selectedDistance : null,
         sourceType: "video",
         profile,
         fileName: file.name,
@@ -188,6 +210,30 @@ function Content() {
       </div>
       <div className="step-card">
         <span className="step-number">4</span>
+        <h2>Type analyse</h2>
+        <div className="analysis-type-grid">
+          {analysisTypeOptions.map((option) => (
+            <button key={option.value} className={analysisType === option.value ? "selected" : ""} onClick={() => setAnalysisType(option.value)}>
+              {option.label}
+            </button>
+          ))}
+        </div>
+        {analysisType === "custom" && (
+          <label className="custom-distance-field">
+            Distance personnalisee en metres
+            <input
+              min={1}
+              inputMode="numeric"
+              type="number"
+              placeholder="3500"
+              value={customDistance}
+              onChange={(event) => setCustomDistance(event.target.value)}
+            />
+          </label>
+        )}
+      </div>
+      <div className="step-card">
+        <span className="step-number">5</span>
         <h2>Vidéo</h2>
         {file ? (
           <div className="video-preview">

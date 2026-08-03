@@ -298,6 +298,7 @@ function AthleteProfile({ id }: { id: string }) {
               </aside>
             </section>
             <nav className="directory-tabs athlete-profile-tabs">
+              <button>Muscle & Power</button>
               <button className="active">Résumé</button>
               <button>Performances</button>
               <button>Analyses</button>
@@ -365,6 +366,24 @@ function AthleteProfile({ id }: { id: string }) {
                 </div>
                 <ScoreGraph />
                 <em>↑ +0.5 points par rapport au mois dernier</em>
+              </section>
+              <section className="athlete-muscle-power-card">
+                <div className="reference-card-title">
+                  <h2>Muscle & Power</h2>
+                  <small>Exploration biomecanique</small>
+                </div>
+                <div className="joint-range-grid">
+                  {["Genou", "Hanche", "Tronc", "Coude", "Epaule", "Poignet"].map((joint) => (
+                    <article key={joint}>
+                      <strong>{joint}</strong>
+                      <span>Min : Non disponible</span>
+                      <span>Max : Non disponible</span>
+                      <span>Amplitude : Non disponible</span>
+                    </article>
+                  ))}
+                </div>
+                <p>Power by Joint Angle, Force-Power-Velocity, symetrie gauche/droite et fatigue musculaire apparaissent ici quand une analyse contient des mesures avec source et confiance.</p>
+                <small>Estimated muscular contribution - Estimated from biomechanics, not direct EMG measurement.</small>
               </section>
               <section>
                 <div className="reference-card-title">
