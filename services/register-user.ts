@@ -23,6 +23,12 @@ function getInitialActiveStatus(role: PublicRegistrationRole): boolean {
   return role === "athlete";
 }
 
+const roleMap: Record<PublicRegistrationRole, UserProfile["role"]> = {
+  athlete: "ATHLETE",
+  coach: "COACH",
+  club_admin: "CLUB_ADMIN",
+};
+
 export async function registerUser(input: RegisterUserInput): Promise<UserProfile> {
   if (!isFirebaseConfigured || !auth || !db) {
     const message = process.env.NODE_ENV === "development" && firebaseConfigurationError
@@ -47,7 +53,7 @@ export async function registerUser(input: RegisterUserInput): Promise<UserProfil
       email,
       firstName,
       lastName,
-      role: input.role,
+      role: roleMap[input.role],
       active: getInitialActiveStatus(input.role),
       clubId: input.clubId?.trim() || null,
       coachId: input.coachId?.trim() || null,

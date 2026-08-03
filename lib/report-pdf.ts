@@ -1,4 +1,5 @@
 import { resolveAnalysisMetrics } from "@/lib/analysis/normalize-analysis";
+import { getDisplayJointRanges, getDisplayMuscleRows, getMuscleMeasurementMeta, jointDisplay, movementVisualPath } from "@/lib/analysis/biomechanics-display";
 import type { RowingAnalysis } from "@/types/analysis";
 
 type PdfDocument = import("jspdf").jsPDF;
@@ -28,39 +29,42 @@ function optionalValueLabel(value: number | null | undefined, unit: string, digi
 }
 
 function muscleRows(analysis: RowingAnalysis): Array<[string, string]> {
-  const estimation = analysis.muscleEstimation?.groups;
-  if (estimation && Object.keys(estimation).length) {
-    return Object.entries(estimation).map(([label, value]) => [label, optionalValueLabel(value, "%")]);
-  }
-  if (analysis.muscleUsage) {
-    return [
-      ["Dos", optionalValueLabel(analysis.muscleUsage.back, "%")],
-      ["Jambes", optionalValueLabel(analysis.muscleUsage.legs, "%")],
-      ["Bras", optionalValueLabel(analysis.muscleUsage.arms, "%")],
-      ["Gainage", optionalValueLabel(analysis.muscleUsage.core, "%")],
-      ["Epaules", optionalValueLabel(analysis.muscleUsage.shoulders, "%")],
-    ];
-  }
-  return [["Utilisation musculaire", "Non disponible"]];
+  return getDisplayMuscleRows(analysis).map(([label, value]) => [label, optionalValueLabel(value, "%")]);
 }
 
 function jointRangeRows(analysis: RowingAnalysis): Array<[string, string]> {
-  const ranges = analysis.biomechanics?.jointRanges ?? {};
-  const joints = [
-    ["Genou", "knee"],
-    ["Hanche", "hip"],
-    ["Tronc", "trunk"],
-    ["Coude", "elbow"],
-    ["Epaule", "shoulder"],
-    ["Poignet", "wrist"],
-  ] as const;
-  return joints.map(([label, key]) => {
+  const ranges = getDisplayJointRanges(analysis);
+  return jointDisplay.map(({ label, key }) => {
     const range = ranges[key];
     return [
       label,
       `Min ${optionalValueLabel(range?.min, "deg")} - Max ${optionalValueLabel(range?.max, "deg")} - Amplitude ${optionalValueLabel(range?.amplitude, "deg")}`,
     ];
   });
+}
+
+async function imageDataUrl(path: string) {
+  if (typeof window === "undefined") return null;
+  try {
+    const response = await fetch(path);
+    const blob = await response.blob();
+    return await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result));
+      reader.onerror = () => reject(reader.error);
+      reader.readAsDataURL(blob);
+    });
+  } catch {
+    return null;
+  }
+}
+
+async function movementVisual(doc: PdfDocument, y: number) {
+  const dataUrl = await imageDataUrl(movementVisualPath);
+  if (!dataUrl) return y;
+  const cursor = ensureSpace(doc, y, 50);
+  doc.addImage(dataUrl, "PNG", 14, cursor, pageWidth(doc) - 28, 48, undefined, "FAST");
+  return cursor + 54;
 }
 
 function pageWidth(doc: PdfDocument) {
@@ -166,6 +170,8 @@ export async function createAnalysisPdf(analysis: RowingAnalysis) {
     ["Régularité", valueLabel(metrics.rhythmScore, "%")],
   ], y);
 
+  y = sectionTitle(doc, "Biomecanique : posture, angles, muscle & power", y + 2);
+  y = await movementVisual(doc, y);
   y = sectionTitle(doc, "Posture et angles", y + 2);
   y = keyValues(doc, [
     ["Angle du genou", valueLabel(metrics.kneeAngle, "°")],
@@ -176,13 +182,14 @@ export async function createAnalysisPdf(analysis: RowingAnalysis) {
   ], y);
 
   y = sectionTitle(doc, "Muscle & Power - Exploration", y + 2);
+  const muscleMeta = getMuscleMeasurementMeta(analysis);
   y = keyValues(doc, [
     ...muscleRows(analysis),
-    ["Source", analysis.muscleEstimation?.measurementSource ?? (analysis.muscleUsage ? "estimated" : "unavailable")],
-    ["Confiance", analysis.muscleEstimation ? `${analysis.muscleEstimation.confidence}%` : "Non disponible"],
+    ["Source", muscleMeta.source],
+    ["Confiance", muscleMeta.confidence == null ? "Non disponible" : `${muscleMeta.confidence}%`],
   ], y);
   y = textList(doc, [
-    analysis.muscleEstimation?.note ?? "Estimated muscular contribution - estimated from biomechanics, not direct EMG measurement.",
+    muscleMeta.note,
   ], y);
 
   y = sectionTitle(doc, "Angles minimum / maximum", y + 2);

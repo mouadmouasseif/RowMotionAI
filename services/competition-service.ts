@@ -20,7 +20,7 @@ function requireCompetitionManager(profile: UserProfile) {
   if (
     !auth?.currentUser ||
     !db ||
-    !["coach", "club_admin", "superadmin"].includes(profile.role)
+    !["COACH", "CLUB_ADMIN", "SUPER_ADMIN"].includes(profile.role)
   ) {
     throw new Error("Gestion des compétitions non autorisée.");
   }
@@ -44,7 +44,7 @@ export async function createCompetition(
   const { database, user } = requireCompetitionManager(profile);
   const reference = await addDoc(collection(database, "competitions"), {
     ...value,
-    clubId: profile.role === "superadmin" ? value.clubId : profile.clubId,
+    clubId: profile.role === "SUPER_ADMIN" ? value.clubId : profile.clubId,
     createdBy: user.uid,
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
@@ -83,10 +83,10 @@ export async function deleteCompetition(profile: UserProfile, id: string) {
   if (!competition.exists()) throw new Error("Compétition introuvable.");
   const data = competition.data();
   const allowed =
-    profile.role === "superadmin" ||
-    (profile.role === "club_admin" &&
+    profile.role === "SUPER_ADMIN" ||
+    (profile.role === "CLUB_ADMIN" &&
       Boolean(profile.clubId && profile.clubId === data.clubId)) ||
-    (profile.role === "coach" && data.createdBy === user.uid);
+    (profile.role === "COACH" && data.createdBy === user.uid);
   if (!allowed) throw new Error("Vous ne pouvez pas supprimer cette compétition.");
 
   const results = await getDocs(
@@ -111,3 +111,4 @@ export async function listCompetitionResults(competitionId?: string) {
     .map((row) => ({ id: row.id, ...row.data() }) as CompetitionResult)
     .filter((row) => !competitionId || row.competitionId === competitionId);
 }
+

@@ -63,7 +63,7 @@ function MyCoachContent() {
 
 export default function MyCoachPage() {
   return (
-    <ProtectedPage allowedRoles={["athlete"]}>
+    <ProtectedPage allowedRoles={["ATHLETE"]}>
       <MyCoachContent />
     </ProtectedPage>
   );

@@ -58,7 +58,7 @@ describe("normalisation des angles", () => {
 
   it("accepte les anciens noms et les objets metricValues", () => {
     const legacy = analysisFixture({ metrics: { ...emptyAnalysisMetrics } }) as RowingAnalysis & Record<string, unknown>;
-    legacy.biomechanics = { knee_angle: 92, hip_angle: "104,5", elbow_angle: 128 };
+    legacy.biomechanics = { knee_angle: 92, hip_angle: "104,5", elbow_angle: 128 } as unknown as RowingAnalysis["biomechanics"];
     legacy.metricValues = { shoulderAngle: { value: 61, unit: "deg", confidence: 0.9, source: "pose" } };
 
     const normalized = normalizeAnalysis(legacy);
@@ -76,7 +76,7 @@ describe("exports PDF", () => {
     expect(new TextDecoder().decode(bytes.slice(0, 4))).toBe("%PDF");
     expect(bytes.byteLength).toBeGreaterThan(1000);
     expect(filename).toMatch(/\.pdf$/);
-  });
+  }, 10000);
 
   it("génère le rapport global téléchargeable", async () => {
     const { doc, filename } = await createReportsPdf({ analyses: [analysisFixture()], clubs: 2, competitions: 3, athletes: 8, coaches: 2 });

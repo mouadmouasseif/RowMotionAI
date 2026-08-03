@@ -58,14 +58,14 @@ function CompetitionsContent() {
   }, [load]);
 
   const canManage = Boolean(
-    profile && ["coach", "club_admin", "superadmin"].includes(profile.role),
+    profile && ["COACH", "CLUB_ADMIN", "SUPER_ADMIN"].includes(profile.role),
   );
   const visibleItems = useMemo(() => {
     if (!profile || scope === "all") return items;
-    if (profile.role === "coach") {
+    if (profile.role === "COACH") {
       return items.filter((item) => item.createdBy === profile.uid);
     }
-    if (profile.role === "club_admin") {
+    if (profile.role === "CLUB_ADMIN") {
       return items.filter((item) => item.clubId === profile.clubId);
     }
     return items.filter((item) => item.createdBy === profile.uid);
@@ -84,9 +84,9 @@ function CompetitionsContent() {
   );
   const canDelete =
     selected &&
-    (profile.role === "superadmin" ||
-      (profile.role === "club_admin" && selected.clubId === profile.clubId) ||
-      (profile.role === "coach" && selected.createdBy === profile.uid));
+    (profile.role === "SUPER_ADMIN" ||
+      (profile.role === "CLUB_ADMIN" && selected.clubId === profile.clubId) ||
+      (profile.role === "COACH" && selected.createdBy === profile.uid));
 
   const remove = async () => {
     if (!selected || !canDelete) return;
@@ -269,3 +269,4 @@ export default function CompetitionsPage() {
     </ProtectedPage>
   );
 }
+

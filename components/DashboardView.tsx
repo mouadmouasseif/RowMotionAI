@@ -1,284 +1,198 @@
 "use client";
 
-import {
-  Activity,
-  Bell,
-  CalendarDays,
-  ChevronRight,
-  Clock3,
-  Dumbbell,
-  FileVideo,
-  Gauge,
-  Medal,
-  Play,
-  Radio,
-  Scale,
-  Sparkles,
-  Star,
-  Timer,
-  TrendingUp,
-  Waves,
-} from "lucide-react";
+import { Activity, AlertTriangle, BarChart3, Bell, CalendarDays, Dumbbell, FileVideo, Gauge, Medal, Radio, TrendingUp, Users } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import { AppShell } from "@/components/AppShell";
 import { useAuth } from "@/providers/AuthProvider";
-import { listAnalyses } from "@/services/analysis-service";
-import type { RowingAnalysis } from "@/types/analysis";
-import { AppShell } from "./AppShell";
+import {
+  getAthleteDashboardData,
+  getClubDashboardData,
+  getCoachDashboardData,
+  getJuryDashboardData,
+  getSuperAdminDashboardData,
+  getTechnicalDirectorDashboardData,
+  type RoleDashboardData,
+} from "@/services/dashboard-service";
+import type { UserRole } from "@/types/user";
 
-const weekPoints = [20, 40, 24, 48, 35, 50, 62, 68, 87];
-const heartPoints = [90, 105, 92, 135, 105, 125, 158];
+const roleCopy: Record<UserRole, { title: string; subtitle: (firstName: string) => string; widgets: string[] }> = {
+  ATHLETE: {
+    title: "Tableau de bord athlete",
+    subtitle: (firstName) => `Bonjour ${firstName}. Voici un apercu de vos performances aujourd'hui.`,
+    widgets: ["Evolution de vos performances", "Zones d'entrainement", "Derniere analyse", "Meilleures performances", "Repartition des analyses", "Groupes musculaires", "Frequence cardiaque", "Activite recente", "Plan d'entrainement actuel", "Notifications"],
+  },
+  COACH: {
+    title: "Tableau de bord coach",
+    subtitle: (firstName) => `Bonjour Coach ${firstName}. Voici un apercu de votre equipe aujourd'hui.`,
+    widgets: ["Evolution de l'equipe", "Repartition zones equipe", "Activite des athletes", "Performances cles", "Repartition des analyses", "Types d'analyses frequents", "Score technique moyen", "Plan equipe", "Calendrier", "Notifications", "Messages", "Charge d'entrainement"],
+  },
+  CLUB_ADMIN: {
+    title: "Tableau de bord club",
+    subtitle: () => "Vue d'ensemble des activites et performances du club.",
+    widgets: ["Evolution performance club", "Repartition entrainements", "Top athletes", "Activite club", "Analyses par type", "Statistiques saison", "Top competitions", "Calendrier club", "Infrastructures", "Equipements", "Notifications", "Performance par groupe"],
+  },
+  TECHNICAL_DIRECTOR: {
+    title: "Directeur Technique",
+    subtitle: () => "Vue strategique multi-equipe et supervision de la performance sportive.",
+    widgets: ["Indice de performance globale", "Etat des athletes", "Top progressions", "Athletes a surveiller", "Coaches", "Repartition entrainement", "Tests", "Biomecanique moyenne", "Puissance musculaire", "Prochaines competitions", "Planification", "Alertes"],
+  },
+  SUPER_ADMIN: {
+    title: "Tableau de bord Superadmin",
+    subtitle: () => "Vue plateforme globale RowMotion AI.",
+    widgets: ["Evolution globale analyses", "Activite temps reel", "Repartition utilisateurs", "Gestion athletes", "Coaches", "Directeurs techniques", "Clubs", "Competitions", "Jury", "Statistiques plateforme", "Top clubs", "Alertes systeme", "Etat systeme", "Actions rapides"],
+  },
+  JURY: {
+    title: "Tableau de bord Jury",
+    subtitle: () => "Affectations, courses et resultats a valider.",
+    widgets: ["Competitions assignees", "Courses aujourd'hui", "Departs", "Resultats a valider", "Penalites", "Protestations", "Prochaines affectations"],
+  },
+};
 
-function LineChart({ points, labels }: { points: number[]; labels: string[] }) {
-  const max = Math.max(...points);
-  const min = Math.min(...points);
-  const coordinates = points.map((value, pointIndex) => ({
-    x: 18 + (pointIndex * 364) / Math.max(points.length - 1, 1),
-    y: 118 - ((value - min) / Math.max(max - min, 1)) * 86,
-  }));
-  const path = coordinates
-    .map((point, index) => `${index ? "L" : "M"} ${point.x} ${point.y}`)
-    .join(" ");
+const widgetIcons = [BarChart3, Gauge, FileVideo, Medal, Activity, Dumbbell, TrendingUp, CalendarDays, Bell, Radio, Users, AlertTriangle];
 
+function SkeletonDashboard() {
   return (
-    <div className="reference-line-chart">
-      <svg viewBox="0 0 400 145" role="img" aria-label="Évolution des performances">
-        {[32, 61, 90, 118].map((y) => <line key={y} x1="18" y1={y} x2="382" y2={y} />)}
-        <path d={path} />
-        {coordinates.map((point) => (
-          <circle key={`${point.x}-${point.y}`} cx={point.x} cy={point.y} r="4" />
-        ))}
-      </svg>
-      <div>{labels.map((label) => <span key={label}>{label}</span>)}</div>
+    <div className="role-dashboard">
+      <section className="reference-stats">
+        {Array.from({ length: 6 }, (_, index) => <article className="skeleton-card" key={index} />)}
+      </section>
+      <section className="role-widget-grid">
+        {Array.from({ length: 6 }, (_, index) => <article className="role-widget skeleton-card" key={index} />)}
+      </section>
     </div>
   );
 }
 
-function Donut({
-  className = "",
-  center,
-  sub,
-}: {
-  className?: string;
-  center?: string;
-  sub?: string;
-}) {
+function EmptyState({ label }: { label: string }) {
   return (
-    <div className={`reference-donut ${className}`}>
-      {center && <span><strong>{center}</strong><small>{sub}</small></span>}
+    <div className="empty-inline">
+      <AlertTriangle />
+      <span>{label}</span>
     </div>
   );
 }
 
-function formatEnvironment(value?: RowingAnalysis["environment"]) {
-  if (value === "boat") return "Sur l’eau";
-  if (value === "beach_sprint") return "Beach sprint";
-  return "Ergomètre";
-}
-
-export function DashboardView() {
+function useRoleDashboardData(role: UserRole | null, enabled: boolean) {
   const { profile } = useAuth();
-  const [analyses, setAnalyses] = useState<RowingAnalysis[]>([]);
+  const [data, setData] = useState<RoleDashboardData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
   useEffect(() => {
-    if (profile) {
-      void listAnalyses(profile, 42).then(setAnalyses).catch(() => setAnalyses([]));
-    }
-  }, [profile]);
+    if (!profile || !role || !enabled) return;
+    let disposed = false;
+    setLoading(true);
+    setError("");
+    const loaders = {
+      ATHLETE: () => getAthleteDashboardData(profile),
+      COACH: () => getCoachDashboardData(profile),
+      CLUB_ADMIN: () => getClubDashboardData(profile),
+      TECHNICAL_DIRECTOR: () => getTechnicalDirectorDashboardData(profile),
+      SUPER_ADMIN: () => getSuperAdminDashboardData(profile),
+      JURY: () => getJuryDashboardData(),
+    } satisfies Record<UserRole, () => Promise<RoleDashboardData>>;
 
-  const completed = useMemo(
-    () => analyses.filter((analysis) => analysis.status === "completed"),
-    [analyses],
-  );
-  const latest = analyses[0];
-  const averageScore = completed.length
-    ? completed.reduce((sum, item) => sum + (item.technicalScore ?? 0), 0) / completed.length
-    : 8.2;
-  const averagePower = Math.round(
-    completed.reduce((sum, item) => sum + (item.metrics?.estimatedPower ?? 0), 0) /
-      Math.max(completed.filter((item) => item.metrics?.estimatedPower).length, 1),
-  ) || 268;
-  const averageCadence = Math.round(
-    completed.reduce((sum, item) => sum + (item.metrics?.strokeRate ?? 0), 0) /
-      Math.max(completed.filter((item) => item.metrics?.strokeRate).length, 1),
-  ) || 28;
+    loaders[role]()
+      .then((value) => { if (!disposed) setData(value); })
+      .catch((reason) => { if (!disposed) setError(reason instanceof Error ? reason.message : "Impossible de charger le dashboard."); })
+      .finally(() => { if (!disposed) setLoading(false); });
+    return () => { disposed = true; };
+  }, [enabled, profile, role]);
 
-  if (!profile) return null;
+  return { data, loading, error };
+}
 
-  const firstName = profile.firstName || "Alex";
-  const todayLabel = new Date().toLocaleDateString("fr-FR", {
-    day: "2-digit",
-    month: "long",
-    year: "numeric",
-  });
-  const statCards = [
-    { icon: Activity, label: "Analyses totales", value: analyses.length || 42, unit: "", trend: "15%" },
-    { icon: Waves, label: "Distance totale", value: "1,248", unit: "km", trend: "8%" },
-    { icon: Timer, label: "Temps total", value: "58h 24m", unit: "", trend: "8%" },
-    { icon: TrendingUp, label: "Puissance moyenne", value: averagePower, unit: "w", trend: "7%", purple: true },
-    { icon: Gauge, label: "Cadence moyenne", value: averageCadence, unit: "spm", trend: "3%" },
-    { icon: Star, label: "Score technique moyen", value: averageScore.toFixed(1), unit: "/10", trend: "9%", purple: true },
-  ];
+export function DashboardView({ previewRole }: { previewRole?: UserRole }) {
+  const { profile } = useAuth();
+  const role = previewRole ?? profile?.role ?? null;
+  const firstName = profile?.firstName || profile?.displayName || "RowMotion";
+  const copy = role ? roleCopy[role] : null;
+  const { data, loading, error } = useRoleDashboardData(role, Boolean(profile));
+  const todayLabel = useMemo(() => new Date().toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric" }), []);
+
+  if (!profile || !role || !copy) return null;
 
   return (
-    <AppShell
-      dashboardMode
-      title="Tableau de bord"
-      subtitle={`Bienvenue ${firstName} ! Voici un aperçu complet de vos performances.`}
-    >
-      <div className="reference-dashboard">
-        <section className="reference-stats">
-          {statCards.map(({ icon: Icon, label, value, unit, trend, purple }) => (
-            <article key={label}>
-              <Icon className={purple ? "purple" : ""} />
+    <AppShell dashboardMode title={copy.title} subtitle={copy.subtitle(firstName)}>
+      {previewRole && <div className="preview-banner">Mode previsualisation Superadmin</div>}
+      {loading ? <SkeletonDashboard /> : (
+        <div className="role-dashboard">
+          {error && <div className="auth-error">{error}</div>}
+          <section className="reference-stats">
+            {(data?.kpis ?? []).map((card, index) => {
+              const Icon = widgetIcons[index % widgetIcons.length];
+              return (
+                <article key={card.label}>
+                  <Icon className={card.tone ?? ""} />
+                  <div>
+                    <small>{card.label}</small>
+                    <strong>{card.value} <i>{card.unit ?? ""}</i></strong>
+                    <em>{data?.analyses.length ? "Donnees Firebase" : "Aucune donnee"}</em>
+                  </div>
+                </article>
+              );
+            })}
+          </section>
+
+          {role === "TECHNICAL_DIRECTOR" && (
+            <section className="technical-hero reference-card">
               <div>
-                <small>{label}</small>
-                <strong>{value} <i>{unit}</i></strong>
-                <em>↑ {trend} <span>vs semaine dernière</span></em>
+                <small>Performance globale</small>
+                <strong>{data?.kpis.find((item) => item.label === "Score technique moyen")?.value ?? "0"} / 100</strong>
+                <span>Technique, puissance, endurance, regularite et progression sont calculees depuis les analyses disponibles.</span>
               </div>
-            </article>
-          ))}
-        </section>
-
-        <section className="reference-grid reference-grid-top">
-          <article className="reference-card latest-analysis-card">
-            <h2>Dernière analyse</h2>
-            <div className="latest-analysis">
-              <div className="latest-visual">
-                {latest?.thumbnailUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={latest.thumbnailUrl} alt="Dernière séance d’aviron" />
-                ) : (
-                  <div className="rower-placeholder"><Waves /></div>
-                )}
-                <span><Play /></span>
-                <time>{latest?.durationSeconds ? `${Math.floor(latest.durationSeconds / 60)}:${String(Math.round(latest.durationSeconds % 60)).padStart(2, "0")}` : "00:20"}</time>
+              <div>
+                <small>Etat de preparation competition</small>
+                <strong>Aucune competition planifiee</strong>
+                <span>Les competitions s&apos;afficheront ici lorsque Firestore contient des evenements de scope.</span>
               </div>
-              <div className="latest-copy">
-                <strong>{latest?.fileName || `Séance du ${todayLabel}`}</strong>
-                <small>{formatEnvironment(latest?.environment)} · 1h 02m · 6,310 m</small>
-                <p>Durée : 20:45 <b>·</b> Distance : 6,310 m</p>
-                <span>Score technique</span>
-                <div><strong>{latest?.technicalScore ? (latest.technicalScore / 10).toFixed(1) : "8.7"}</strong><i>/10</i><em>Excellent</em></div>
-                <Link href={latest ? `/analyses/${latest.id}` : "/analyses"}>Voir l’analyse complète <ChevronRight /></Link>
-              </div>
-            </div>
-          </article>
+            </section>
+          )}
 
-          <article className="reference-card progress-card">
-            <div className="reference-card-title"><h2>Progression cette semaine</h2><button>Performance⌄</button></div>
-            <LineChart points={weekPoints} labels={["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"]} />
-          </article>
+          {role === "SUPER_ADMIN" && (
+            <section className="quick-actions reference-card">
+              {["+ Ajouter athlete", "+ Ajouter coach", "+ Ajouter directeur technique", "+ Creer club", "+ Creer competition", "+ Ajouter jury", "+ Generer rapport global"].map((label) => (
+                <Link className="button ghost" href={label.includes("club") ? "/super-admin/clubs" : label.includes("rapport") ? "/rapports" : "/super-admin/users"} key={label}>{label}</Link>
+              ))}
+              <Link className="button primary" href="/super-admin/preview?role=COACH">Voir comme</Link>
+            </section>
+          )}
 
-          <article className="reference-card zones-card">
-            <h2>Zones d’entraînement</h2>
-            <div className="zones-content">
-              <Donut />
-              <ul>
-                <li><i className="blue" />UT2 <strong>45%</strong></li>
-                <li><i className="green" />UT1 <strong>25%</strong></li>
-                <li><i className="yellow" />AT <strong>15%</strong></li>
-                <li><i className="purple" />TR <strong>10%</strong></li>
-                <li><i className="red" />AN <strong>5%</strong></li>
-              </ul>
-            </div>
-          </article>
-        </section>
+          <section className="role-widget-grid">
+            {copy.widgets.map((label, index) => {
+              const Icon = widgetIcons[index % widgetIcons.length];
+              return (
+                <article className="role-widget reference-card" key={label}>
+                  <div className="reference-card-title"><h2>{label}</h2><Icon /></div>
+                  {index === 0 && data?.analyses.length ? (
+                    <p>{data.analyses.length} analyse(s) chargee(s) depuis Firebase au {todayLabel}.</p>
+                  ) : index === 2 && data?.analyses[0] ? (
+                    <Link href={`/analyses/${data.analyses[0].id}`}>{data.analyses[0].fileName || data.analyses[0].athleteName || "Derniere analyse"}</Link>
+                  ) : (
+                    <EmptyState label="Aucune donnee Firebase disponible pour ce widget." />
+                  )}
+                </article>
+              );
+            })}
+          </section>
 
-        <section className="reference-grid reference-grid-middle">
-          <article className="reference-card muscles-card">
-            <h2>Groupes musculaires</h2>
-            <div className="muscles-content">
-              <Dumbbell className="body-icon" />
-              <ul>
-                {[["Dos", 92], ["Jambes", 88], ["Bras", 76], ["Gainage", 85], ["Épaules", 70]].map(([name, value]) => (
-                  <li key={name}><span>{name}</span><i><b style={{ width: `${value}%` }} /></i><strong>{value}%</strong></li>
+          {data?.rows.length ? (
+            <section className="role-table reference-card">
+              <h2>{role === "COACH" ? "Activite athlete" : "Activite recente"}</h2>
+              <div>
+                {data.rows.map((row, index) => (
+                  <Link href={row.href ?? "#"} key={`${row.cells.join("-")}-${index}`}>
+                    {row.cells.map((cell) => <span key={cell}>{cell}</span>)}
+                  </Link>
                 ))}
-              </ul>
-            </div>
-          </article>
-
-          <article className="reference-card distribution-card">
-            <h2>Répartition des analyses</h2>
-            <div className="distribution-content">
-              <Donut center={String(analyses.length || 42)} sub="Analyses" />
-              <ul>
-                <li><i className="blue" />Ergomètre <strong>52%</strong></li>
-                <li><i className="green" />Sur l’eau <strong>28%</strong></li>
-                <li><i className="yellow" />Force <strong>12%</strong></li>
-                <li><i className="purple" />Mobilité <strong>8%</strong></li>
-              </ul>
-            </div>
-          </article>
-
-          <article className="reference-card best-card">
-            <h2>Meilleures performances</h2>
-            <div><Medal /><span><strong>6,310 <i>m</i></strong><small>Ergomètre · {todayLabel}</small></span><em>Nouveau record</em></div>
-            <div><Medal /><span><strong>2:18.4 <i>/500m</i></strong><small>Ergomètre · {todayLabel}</small></span></div>
-            <div><Medal /><span><strong>1,024 <i>w</i></strong><small>Puissance max · {todayLabel}</small></span></div>
-          </article>
-
-          <article className="reference-card heart-card">
-            <div className="reference-card-title"><h2>Fréquence cardiaque (moyenne)</h2><button>bpm⌄</button></div>
-            <LineChart points={heartPoints} labels={["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"]} />
-          </article>
-        </section>
-
-        <section className="reference-grid reference-grid-bottom">
-          <article className="reference-card activity-card">
-            <h2>Activité récente</h2>
-            {[
-              [Clock3, "Analyse terminée", `Séance du ${todayLabel}`, "Aujourd’hui", "Score 8.7"],
-              [TrendingUp, "Nouvelle performance", "6,310 m sur ergomètre", "Il y a 1 jour", "Record"],
-              [CalendarDays, "Plan d’entraînement", "Endurance Fondamentale", "Réinitialisé aujourd’hui", "0% complété"],
-              [Scale, "Poids enregistré", "84.2 kg", "Il y a 2 jours", "-0.3 kg"],
-            ].map(([Icon, title, sub, time, result]) => (
-              <div key={String(title)}><span><Icon /></span><p><strong>{String(title)}</strong><small>{String(sub)}</small></p><time>{String(time)}<em>{String(result)}</em></time></div>
-            ))}
-            <Link href="/analyses">Voir tout l’historique <ChevronRight /></Link>
-          </article>
-
-          <article className="reference-card plan-card">
-            <div className="reference-card-title"><h2>Plan d’entraînement actuel</h2><em>Semaine 1/8</em></div>
-            <strong>Endurance Fondamentale</strong>
-            <small>0% complété</small>
-            <div className="plan-progress"><i style={{ width: "0%" }} /></div>
-            <span>0 min</span>
-            <div className="next-session">
-              <small>Prochaine séance</small>
-              <strong><CalendarDays /> Demain · 10:00 <b>·</b> <Radio /> Ergomètre</strong>
-              <p>Travail d’endurance à intensité modérée.</p>
-            </div>
-            <Link href="/progression">Voir le plan complet <ChevronRight /></Link>
-          </article>
-
-          <article className="reference-card nutrition-card">
-            <h2>Nutrition du jour</h2>
-            <div className="nutrition-content">
-              <Donut className="nutrition-donut" center="1,850" sub="/ 2,400 kcal" />
-              <ul>
-                {[["Protéines", "126 g / 160 g", 79], ["Glucides", "210 g / 280 g", 75], ["Lipides", "58 g / 70 g", 83]].map(([name, value, percent]) => (
-                  <li key={name}><span>{name}<small>{value}</small></span><strong>{percent}%</strong><i><b style={{ width: `${percent}%` }} /></i></li>
-                ))}
-              </ul>
-            </div>
-            <Link href="/progression">Voir le journal alimentaire <ChevronRight /></Link>
-          </article>
-
-          <article className="reference-card notifications-card">
-            <div className="reference-card-title"><h2>Notifications</h2><Link href="/notifications">Tout marquer comme lu</Link></div>
-            {[
-              [FileVideo, "Votre analyse est prête", `Séance du ${todayLabel}`, "Aujourd’hui"],
-              [Bell, "Rappel d’entraînement", "Votre séance de demain à 10:00", "Il y a 4 h"],
-              [Sparkles, "Nouveau conseil", "3 conseils techniques disponibles", "Il y a 1 jour"],
-              [Clock3, "Mise à jour", "Une nouvelle fonctionnalité est disponible", "Il y a 2 jours"],
-            ].map(([Icon, title, sub, time]) => (
-              <div key={String(title)}><Icon /><p><strong>{String(title)}</strong><small>{String(sub)}</small></p><time>{String(time)}</time><i /></div>
-            ))}
-            <Link className="all-notifications" href="/notifications">Voir toutes les notifications <ChevronRight /></Link>
-          </article>
-        </section>
-      </div>
+              </div>
+            </section>
+          ) : (
+            <section className="reference-card"><EmptyState label="Aucune ligne d'activite disponible." /></section>
+          )}
+        </div>
+      )}
     </AppShell>
   );
 }

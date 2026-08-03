@@ -41,8 +41,8 @@ function AthletesContent() {
     if (!profile) return;
     const [athletes, availableClubs, availableCoaches] = await Promise.all([
       listAthletes(profile),
-      profile.role === "superadmin" ? listClubs(profile) : Promise.resolve([]),
-      profile.role === "superadmin" ? listCoaches(profile) : Promise.resolve([]),
+      profile.role === "SUPER_ADMIN" ? listClubs(profile) : Promise.resolve([]),
+      profile.role === "SUPER_ADMIN" ? listCoaches(profile) : Promise.resolve([]),
     ]);
     setItems(athletes);
     setClubs(availableClubs);
@@ -199,7 +199,7 @@ function AthletesContent() {
                     <Link href={`/athletes/${athlete.uid}`} aria-label={`Voir ${athlete.firstName}`}>
                       <Eye />
                     </Link>
-                    {profile.role === "superadmin" ? (
+                    {profile.role === "SUPER_ADMIN" ? (
                       <>
                         <button
                           aria-label={`Modifier ${athlete.firstName}`}
@@ -273,8 +273,9 @@ function AthletesContent() {
 
 export default function AthletesPage() {
   return (
-    <ProtectedPage allowedRoles={["coach", "club_admin", "superadmin"]}>
+    <ProtectedPage allowedRoles={["COACH", "CLUB_ADMIN", "SUPER_ADMIN"]}>
       <AthletesContent />
     </ProtectedPage>
   );
 }
+

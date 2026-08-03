@@ -51,7 +51,7 @@ export async function PUT(
 ) {
   try {
     const actor = await requireApiUser(request);
-    if (actor.role !== "superadmin") throw new Error("FORBIDDEN");
+    if (actor.role !== "SUPER_ADMIN") throw new Error("FORBIDDEN");
     const { userId } = await context.params;
     const { auth, db } = getAdminServices();
     const reference = db.doc(`users/${userId}`);
@@ -63,7 +63,7 @@ export async function PUT(
     const email = nullableString(body.email)?.toLowerCase();
     if (!email || !email.includes("@")) throw new Error("INVALID_EMAIL");
     const clubId = nullableString(body.clubId);
-    const coachId = current.role === "athlete" ? nullableString(body.coachId) : null;
+    const coachId = current.role === "ATHLETE" ? nullableString(body.coachId) : null;
     const selectedDisciplines = Array.isArray(body.disciplines)
       ? body.disciplines.filter(
           (value): value is ProfileDiscipline =>
@@ -81,7 +81,7 @@ export async function PUT(
       const coach = await db.doc(`users/${coachId}`).get();
       if (
         !coach.exists ||
-        coach.data()?.role !== "coach" ||
+        coach.data()?.role !== "COACH" ||
         !clubId ||
         coach.data()?.clubId !== clubId
       ) {
@@ -137,7 +137,7 @@ export async function PUT(
       updatedBy: actor.uid,
     });
 
-    if (current.role === "coach" && current.clubId !== clubId) {
+    if (current.role === "COACH" && current.clubId !== clubId) {
       const assigned = await db.collection("users").where("coachId", "==", userId).get();
       for (const athlete of assigned.docs) {
         if (!clubId || athlete.data().clubId !== clubId) {
@@ -161,7 +161,7 @@ export async function DELETE(
 ) {
   try {
     const actor = await requireApiUser(request);
-    if (actor.role !== "superadmin") throw new Error("FORBIDDEN");
+    if (actor.role !== "SUPER_ADMIN") throw new Error("FORBIDDEN");
     const { userId } = await context.params;
     if (actor.uid === userId) throw new Error("Vous ne pouvez pas supprimer votre propre compte.");
     const { auth, db } = getAdminServices();

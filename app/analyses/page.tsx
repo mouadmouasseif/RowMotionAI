@@ -195,7 +195,7 @@ function AnalysesContent() {
                   <div className="analysis-actions">
                     <Link href={row.item ? `/analyses/${row.id}` : "/analyses/nouvelle"} aria-label="Voir"><Eye /></Link>
                     <Link href={row.item ? `/analyses/${row.id}` : "/progression"} aria-label="Graphiques"><BarChart3 /></Link>
-                    {row.item && (profile.role === "superadmin" || profile.uid === row.item.createdBy) ? (
+                    {row.item && (profile.role === "SUPER_ADMIN" || profile.uid === row.item.createdBy) ? (
                       <button aria-label="Supprimer" onClick={async () => {
                         if (!confirm("Supprimer cette analyse ?")) return;
                         try {
@@ -231,3 +231,4 @@ function TrendingIcon() {
 export default function AnalysesPage() {
   return <ProtectedPage><AnalysesContent /></ProtectedPage>;
 }
+

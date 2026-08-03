@@ -40,7 +40,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
         if (!snapshot.exists()) throw new Error("Profil absent");
         const loadedProfile = createUserProfile(firebaseUser.uid, firebaseUser.email, snapshot.data());
-        if (!loadedProfile.active) throw new Error("Compte désactivé");
         if(!disposed){setUser(firebaseUser);setProfile(loadedProfile);}
       } catch {
         await signOut(currentAuth);

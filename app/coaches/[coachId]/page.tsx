@@ -363,7 +363,7 @@ export default function CoachProfilePage({
 }) {
   const { coachId } = use(params);
   return (
-    <ProtectedPage allowedRoles={["club_admin", "superadmin"]}>
+    <ProtectedPage allowedRoles={["CLUB_ADMIN", "SUPER_ADMIN"]}>
       <CoachProfile coachId={coachId} />
     </ProtectedPage>
   );

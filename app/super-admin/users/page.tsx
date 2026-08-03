@@ -49,8 +49,9 @@ function UsersContent() {
 
 export default function SuperAdminUsersPage() {
   return (
-    <ProtectedPage allowedRoles={["superadmin"]}>
+    <ProtectedPage allowedRoles={["SUPER_ADMIN"]}>
       <UsersContent />
     </ProtectedPage>
   );
 }
+

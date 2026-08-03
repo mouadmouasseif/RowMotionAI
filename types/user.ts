@@ -1,5 +1,13 @@
 export type PublicRegistrationRole = "athlete" | "coach" | "club_admin";
-export type UserRole = PublicRegistrationRole | "superadmin";
+export type UserRole =
+  | "SUPER_ADMIN"
+  | "TECHNICAL_DIRECTOR"
+  | "CLUB_ADMIN"
+  | "COACH"
+  | "ATHLETE"
+  | "JURY";
+export type FutureUserRole = "FEDERATION_ADMIN" | "MEDICAL_STAFF" | "PHYSICAL_TRAINER";
+export type LegacyUserRole = "athlete" | "coach" | "club_admin" | "superadmin";
 export type ProfileDiscipline = "ERGOMETER" | "SKIFF" | "BEACH_ROWING";
 export type ProfileCategory = "U15" | "U19" | "U21" | "U23" | "SENIOR";
 export type ProfileGender = "male" | "female" | "other" | "not_specified";
@@ -45,20 +53,44 @@ export interface UserProfile {
   sportStatus: "active" | "injured" | "inactive" | "archived";
   createdAt?: unknown;
   updatedAt?: unknown;
+  displayName?: string;
+  photoURL?: string | null;
+  onboardingCompleted?: boolean;
+  technicalScope?: {
+    type: "CLUB" | "MULTI_CLUB" | "FEDERATION";
+    clubIds: string[];
+  } | null;
 }
 
-export const userRoles: UserRole[] = ["athlete", "coach", "club_admin", "superadmin"];
+export const userRoles: UserRole[] = ["SUPER_ADMIN", "TECHNICAL_DIRECTOR", "CLUB_ADMIN", "COACH", "ATHLETE", "JURY"];
+const legacyRoleMap: Record<LegacyUserRole, UserRole> = {
+  athlete: "ATHLETE",
+  coach: "COACH",
+  club_admin: "CLUB_ADMIN",
+  superadmin: "SUPER_ADMIN",
+};
 
 export function isUserRole(value: unknown): value is UserRole {
   return typeof value === "string" && userRoles.includes(value as UserRole);
 }
 
-export function getDashboardPath(role: UserRole): string {
-  const paths: Record<UserRole, string> = {
-    superadmin: "/super-admin/dashboard",
-    club_admin: "/club/dashboard",
-    coach: "/coach/dashboard",
-    athlete: "/athlete/dashboard",
-  };
-  return paths[role];
+export function normalizeUserRole(value: unknown): UserRole | null {
+  if (isUserRole(value)) return value;
+  if (typeof value === "string" && value in legacyRoleMap) return legacyRoleMap[value as LegacyUserRole];
+  return null;
 }
+
+export function getDashboardRouteByRole(role: UserRole | null | undefined): string {
+  if (!role) return "/connexion";
+  const paths: Record<UserRole, string> = {
+    SUPER_ADMIN: "/super-admin/dashboard",
+    TECHNICAL_DIRECTOR: "/technical-director/dashboard",
+    CLUB_ADMIN: "/club/dashboard",
+    COACH: "/coach/dashboard",
+    ATHLETE: "/athlete/dashboard",
+    JURY: "/jury/dashboard",
+  };
+  return paths[role] ?? "/connexion";
+}
+
+export const getDashboardPath = getDashboardRouteByRole;

@@ -335,7 +335,7 @@ export default function ClubProfilePage({
 }) {
   const { clubId } = use(params);
   return (
-    <ProtectedPage allowedRoles={["club_admin", "superadmin"]}>
+    <ProtectedPage allowedRoles={["CLUB_ADMIN", "SUPER_ADMIN"]}>
       <ClubProfile clubId={clubId} />
     </ProtectedPage>
   );

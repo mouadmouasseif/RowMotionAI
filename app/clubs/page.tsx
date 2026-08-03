@@ -322,8 +322,9 @@ function ClubsContent() {
 }
 export default function ClubsPage() {
   return (
-    <ProtectedPage allowedRoles={["superadmin"]}>
+    <ProtectedPage allowedRoles={["SUPER_ADMIN"]}>
       <ClubsContent />
     </ProtectedPage>
   );
 }
+

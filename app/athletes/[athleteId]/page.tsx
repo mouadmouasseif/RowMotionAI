@@ -478,7 +478,7 @@ export default function AthleteProfilePage({
 }) {
   const { athleteId } = use(params);
   return (
-    <ProtectedPage allowedRoles={["coach", "club_admin", "superadmin"]}>
+    <ProtectedPage allowedRoles={["COACH", "CLUB_ADMIN", "SUPER_ADMIN"]}>
       <AthleteProfile id={athleteId} />
     </ProtectedPage>
   );

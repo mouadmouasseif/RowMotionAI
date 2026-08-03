@@ -23,6 +23,7 @@ import {
 import { AnalysisVideoSource } from "@/components/AnalysisVideoSource";
 import { AppShell } from "@/components/AppShell";
 import { ProtectedPage } from "@/components/ProtectedPage";
+import { getDisplayJointRanges, getDisplayMuscleRows, getMuscleMeasurementMeta, jointDisplay, movementVisualPath } from "@/lib/analysis/biomechanics-display";
 import { downloadAnalysisPdf } from "@/lib/report-pdf";
 import { useAuth } from "@/providers/AuthProvider";
 import {
@@ -36,7 +37,7 @@ import {
 import type { AnalysisMetrics, MetricSample, MuscleUsage, RowingAnalysis, StrokeCycle } from "@/types/analysis";
 
 type ComparisonMode = "general" | "video" | "training";
-type AnalysisTab = "summary" | "timeline" | "stroke" | "phases" | "race" | "start" | "finish" | "turns" | "technique" | "performance" | "muscle" | "fatigue" | "comparison" | "coach";
+type AnalysisTab = "summary" | "timeline" | "stroke" | "phases" | "race" | "start" | "finish" | "turns" | "technique" | "performance" | "muscle" | "fatigue" | "comparison" | "COACH";
 type MetricKey = keyof AnalysisMetrics | "technicalScore" | "durationSeconds";
 
 interface MetricDefinition {
@@ -256,6 +257,21 @@ function EmptyAdvanced({ label }: { label: string }) {
   return <div className="advanced-empty"><strong>{label}</strong><p>Non disponible. Aucune donnee mesuree ou estimee avec source et confiance reste enregistree pour cette analyse.</p></div>;
 }
 
+function MovementVisualPanels({ environment }: { environment: RowingAnalysis["environment"] }) {
+  return (
+    <div className="movement-visual-grid">
+      <article className={environment === "ergometer" ? "active" : ""}>
+        <span>Machine / Ergomètre</span>
+        <i style={{ backgroundImage: `url(${movementVisualPath})` }} aria-label="Activation musculaire en machine" />
+      </article>
+      <article className={environment !== "ergometer" ? "active" : ""}>
+        <span>Bateau</span>
+        <i style={{ backgroundImage: `url(${movementVisualPath})` }} aria-label="Mouvement musculaire en bateau" />
+      </article>
+    </div>
+  );
+}
+
 function AdvancedAnalysisPanel({ analysis, tab }: { analysis: RowingAnalysis; tab: AnalysisTab }) {
   const segments = distanceSegments(analysis);
   if (tab === "timeline") {
@@ -297,15 +313,47 @@ function AdvancedAnalysisPanel({ analysis, tab }: { analysis: RowingAnalysis; ta
     return <section className="advanced-analysis-card"><h2>Stroke Analysis</h2><div className="advanced-table">{strokes.slice(0, 12).map((stroke) => <article key={stroke.index}><strong>Stroke {stroke.index}</strong><span>{formatNullable(stroke.duration, "s")}</span><span>{formatNullable(stroke.strokeRate, "spm")}</span><span>{formatNullable(stroke.power, "W")}</span><small>{stroke.measurementSource} · {stroke.confidence}%</small></article>)}</div></section>;
   }
   if (tab === "muscle") {
-    const ranges = analysis.biomechanics?.jointRanges ?? {};
-    const estim = analysis.muscleEstimation;
-    return <section className="advanced-analysis-card"><h2>Muscle & Power</h2><p>Estimated muscular contribution. Estimated from biomechanics - not direct EMG measurement.</p><div className="joint-range-grid">{["knee", "hip", "trunk", "elbow", "shoulder", "wrist"].map((joint) => <article key={joint}><strong>{joint.toUpperCase()}</strong><span>Min : {formatNullable(ranges[joint]?.min, "deg")}</span><span>Max : {formatNullable(ranges[joint]?.max, "deg")}</span><span>Amplitude : {formatNullable(ranges[joint]?.amplitude, "deg")}</span></article>)}</div>{estim ? <div className="score-grid">{Object.entries(estim.groups).map(([name, value]) => <article key={name}><small>{name}</small><strong>{formatNullable(value, "%")}</strong></article>)}</div> : <EmptyAdvanced label="Contribution musculaire estimee" />}</section>;
+    const ranges = getDisplayJointRanges(analysis);
+    const muscles = getDisplayMuscleRows(analysis);
+    const meta = getMuscleMeasurementMeta(analysis);
+    return (
+      <section className="advanced-analysis-card muscle-power-exploration">
+        <h2>Muscle & Power - Exploration</h2>
+        <p>Contribution musculaire estimee depuis la biomécanique. Ce n&apos;est pas une mesure EMG directe.</p>
+        <MovementVisualPanels environment={analysis.environment} />
+        <div className="joint-range-grid">
+          {jointDisplay.map((joint) => (
+            <article key={joint.key}>
+              <strong>{joint.label}</strong>
+              <span>Min : {formatNullable(ranges[joint.key]?.min, "deg")}</span>
+              <span>Max : {formatNullable(ranges[joint.key]?.max, "deg")}</span>
+              <span>Amplitude : {formatNullable(ranges[joint.key]?.amplitude, "deg")}</span>
+            </article>
+          ))}
+        </div>
+        <div className="score-grid">
+          {muscles.map(([name, value]) => <article key={name}><small>{name}</small><strong>{formatNullable(value, "%")}</strong></article>)}
+          <article><small>Source</small><strong>{meta.source}</strong></article>
+          <article><small>Confiance</small><strong>{meta.confidence == null ? "Non disponible" : `${meta.confidence}%`}</strong></article>
+        </div>
+        <div className="posture-power-grid">
+          {([
+            ["Angle du genou", analysis.metrics?.kneeAngle],
+            ["Angle de la hanche", analysis.metrics?.hipAngle],
+            ["Inclinaison du dos", analysis.metrics?.backAngle],
+            ["Angle des épaules", analysis.metrics?.shoulderAngle],
+            ["Angle des coudes", analysis.metrics?.elbowAngle],
+          ] as const).map(([label, value]) => <article key={label}><small>{label}</small><strong>{formatNullable(value, "°")}</strong></article>)}
+        </div>
+        <p>{meta.note}</p>
+      </section>
+    );
   }
   if (tab === "fatigue") {
     const fatigue = analysis.fatigue;
     return <section className="advanced-analysis-card"><h2>Fatigue musculaire</h2>{fatigue ? <div className="score-grid"><article><small>Power Loss</small><strong>{formatNullable(fatigue.powerLoss, "%")}</strong></article><article><small>Stroke Length</small><strong>{formatNullable(fatigue.strokeLengthLoss, "%")}</strong></article><article><small>Technique Loss</small><strong>{formatNullable(fatigue.techniqueLoss, "%")}</strong></article><article><small>Fatigue Index</small><strong>{formatNullable(fatigue.index, "/100")}</strong></article></div> : <EmptyAdvanced label="Fatigue Index" />}</section>;
   }
-  if (tab === "coach") {
+  if (tab === "COACH") {
     return <section className="advanced-analysis-card"><h2>AI Coach</h2><div className="analysis-conclusion-grid"><article><strong>Points forts</strong><p>{analysis.recommendations?.[0] ?? "Non disponible tant que l'analyse ne contient pas assez de donnees exploitables."}</p></article><article><strong>Points a ameliorer</strong><p>{analysis.errors?.[0] ?? "Non disponible."}</p></article><article><strong>Priorite technique</strong><p>{analysis.recommendations?.[1] ?? "Maintenir la longueur du coup lorsque la cadence augmente, si cette tendance est confirmee par les mesures."}</p></article><article><strong>Priorite physique</strong><p>Non disponible sans puissance, fatigue ou capteur associe.</p></article></div></section>;
   }
   return null;
@@ -448,7 +496,7 @@ function Detail({ id }: { id: string }) {
               <button className={tab === "turns" ? "active" : ""} onClick={() => setTab("turns")}>Turns</button>
               <button className={tab === "muscle" ? "active" : ""} onClick={() => setTab("muscle")}>Muscle & Power</button>
               <button className={tab === "fatigue" ? "active" : ""} onClick={() => setTab("fatigue")}>Fatigue</button>
-              <button className={tab === "coach" ? "active" : ""} onClick={() => setTab("coach")}>AI Coach</button>
+              <button className={tab === "COACH" ? "active" : ""} onClick={() => setTab("COACH")}>AI Coach</button>
               <button className={tab === "summary" ? "active" : ""} onClick={() => setTab("summary")}>Résumé</button>
               {(analysis.analysisScope ?? "complete") === "complete" && <button className={tab === "phases" ? "active" : ""} onClick={() => setTab("phases")}>Phases du coup</button>}
               {(analysis.analysisScope ?? "complete") === "complete" && <button className={tab === "technique" ? "active" : ""} onClick={() => setTab("technique")}>Angles & technique</button>}
@@ -482,11 +530,11 @@ function Detail({ id }: { id: string }) {
               ))}
             </section>
 
-            {["timeline", "stroke", "race", "start", "finish", "turns", "muscle", "fatigue", "coach"].includes(tab) && (
+            {["timeline", "stroke", "race", "start", "finish", "turns", "muscle", "fatigue", "COACH"].includes(tab) && (
               <AdvancedAnalysisPanel analysis={analysis} tab={tab} />
             )}
 
-            {!["comparison", "timeline", "stroke", "race", "start", "finish", "turns", "muscle", "fatigue", "coach"].includes(tab) && (
+            {!["comparison", "timeline", "stroke", "race", "start", "finish", "turns", "muscle", "fatigue", "COACH"].includes(tab) && (
               <>
               <div className={`video-analysis-layout ${tab}-view ${(analysis.analysisScope ?? "complete") === "general" ? "general-scope" : "complete-scope"}`}>
                 <main>
@@ -578,6 +626,7 @@ function Detail({ id }: { id: string }) {
                   </section>
                   <section className="muscle-usage-card">
                     <header><Activity /><div><h2>Groupes musculaires</h2><small>Pourcentage d’utilisation estimé pour cette analyse</small></div></header>
+                    <MovementVisualPanels environment={analysis.environment} />
                     <div>
                       {([
                         ["Dos", muscleUsageFor(analysis).back],
@@ -701,7 +750,7 @@ function Detail({ id }: { id: string }) {
               </section>
             )}
 
-            {["coach", "club_admin", "superadmin"].includes(profile.role) && (
+            {["COACH", "CLUB_ADMIN", "SUPER_ADMIN"].includes(profile.role) && (
               <section className="coach-note-reference">
                 <h2>Note coach</h2>
                 <textarea value={note} onChange={(event) => setNote(event.target.value)} placeholder="Ajoutez votre commentaire technique…" />

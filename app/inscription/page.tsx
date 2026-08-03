@@ -64,7 +64,7 @@ export default function RegistrationPage() {
           console.warn("[RowMotion] Optional profile photo upload failed:", photoError);
         }
       }
-      if (profile.role === "athlete") router.replace("/athlete/dashboard");
+      if (profile.role === "ATHLETE") router.replace("/athlete/dashboard");
       else router.replace(`/pending-approval?role=${profile.role}`);
       router.refresh();
     } catch (error) {

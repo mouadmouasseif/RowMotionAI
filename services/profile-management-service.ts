@@ -14,7 +14,7 @@ export async function updateClubProfile(
   values: Partial<Pick<Club, "name" | "shortName" | "city" | "country" | "email" | "phone" | "active">>,
 ) {
   const database = requireDatabase();
-  if (manager.role !== "superadmin" && !(manager.role === "club_admin" && manager.clubId === clubId)) {
+  if (manager.role !== "SUPER_ADMIN" && !(manager.role === "CLUB_ADMIN" && manager.clubId === clubId)) {
     throw new Error("Vous n’êtes pas autorisé à modifier ce club.");
   }
   await updateDoc(doc(database, "clubs", clubId), { ...values, updatedAt: serverTimestamp() });
@@ -34,10 +34,11 @@ export async function updateCoachProfile(
 ) {
   const database = requireDatabase();
   if (
-    !["club_admin", "superadmin"].includes(manager.role) ||
-    (manager.role === "club_admin" && manager.clubId !== coach.clubId)
+    !["CLUB_ADMIN", "SUPER_ADMIN"].includes(manager.role) ||
+    (manager.role === "CLUB_ADMIN" && manager.clubId !== coach.clubId)
   ) {
     throw new Error("Vous n’êtes pas autorisé à modifier ce coach.");
   }
   await updateDoc(doc(database, "users", coach.uid), { ...values, updatedAt: serverTimestamp() });
 }
+

@@ -37,11 +37,11 @@ function qrProjection(profile: UserProfile): QrProfile {
 
 export async function listAthletes(profile: UserProfile): Promise<UserProfile[]> {
   if (!auth?.currentUser || !db) throw new Error("Session Firebase indisponible.");
-  if (profile.role === "athlete") return [profile];
+  if (profile.role === "ATHLETE") return [profile];
   const users = collection(db, "users");
-  const constraints = profile.role === "superadmin" ? [where("role", "==", "athlete")]
-    : profile.role === "club_admin" && profile.clubId ? [where("role", "==", "athlete"), where("clubId", "==", profile.clubId)]
-    : [where("role", "==", "athlete"), where("coachId", "==", profile.uid)];
+  const constraints = profile.role === "SUPER_ADMIN" ? [where("role", "==", "ATHLETE")]
+    : (profile.role === "CLUB_ADMIN" || profile.role === "TECHNICAL_DIRECTOR") && profile.clubId ? [where("role", "==", "ATHLETE"), where("clubId", "==", profile.clubId)]
+    : [where("role", "==", "ATHLETE"), where("coachId", "==", profile.uid)];
   const snapshot = await getDocs(query(users, ...constraints));
   return snapshot.docs.map((item) => createUserProfile(item.id, typeof item.data().email === "string" ? item.data().email : null, item.data()));
 }
@@ -97,25 +97,25 @@ export async function removePersonalBest(uid: string, performanceId: string) {
 }
 
 export async function listCoaches(profile: UserProfile): Promise<UserProfile[]> {
-  if (!auth?.currentUser || !db || !["superadmin", "club_admin"].includes(profile.role) || !profile.active) throw new Error("Accès réservé à l’administration.");
-  const constraints = [where("role", "==", "coach")];
-  if (profile.role === "club_admin") { if (!profile.clubId) return []; constraints.push(where("clubId", "==", profile.clubId)); }
+  if (!auth?.currentUser || !db || !["SUPER_ADMIN", "CLUB_ADMIN"].includes(profile.role) || !profile.active) throw new Error("Accès réservé à l’administration.");
+  const constraints = [where("role", "==", "COACH")];
+  if (profile.role === "CLUB_ADMIN") { if (!profile.clubId) return []; constraints.push(where("clubId", "==", profile.clubId)); }
   const snapshot = await getDocs(query(collection(db, "users"), ...constraints));
   return snapshot.docs.map((item) => createUserProfile(item.id, typeof item.data().email === "string" ? item.data().email : null, item.data()));
 }
 
 export async function setCoachActive(profile: UserProfile, coachUid: string, active: boolean) {
-  if (!auth?.currentUser || !db || !["superadmin", "club_admin"].includes(profile.role) || !profile.active) throw new Error("Accès réservé à l’administration.");
-  if (profile.role === "club_admin") { const snapshot = await getDoc(doc(db, "users", coachUid)); if (!snapshot.exists() || snapshot.data().clubId !== profile.clubId || snapshot.data().role !== "coach") throw new Error("Ce coach ne fait pas partie de votre club."); }
+  if (!auth?.currentUser || !db || !["SUPER_ADMIN", "CLUB_ADMIN"].includes(profile.role) || !profile.active) throw new Error("Accès réservé à l’administration.");
+  if (profile.role === "CLUB_ADMIN") { const snapshot = await getDoc(doc(db, "users", coachUid)); if (!snapshot.exists() || snapshot.data().clubId !== profile.clubId || snapshot.data().role !== "COACH") throw new Error("Ce coach ne fait pas partie de votre club."); }
   await updateDoc(doc(db, "users", coachUid), { active, validatedBy: profile.uid, validatedAt: serverTimestamp(), updatedAt: serverTimestamp() });
 }
 
 export async function updateManagedAthleteProfile(manager: UserProfile, athleteUid: string, values: { officialCategory?: string | null; categoryOverrideReason?: string | null; disciplines?: ProfileDiscipline[]; primaryDiscipline?: ProfileDiscipline | null; sportStatus?: UserProfile["sportStatus"] }) {
-  if (!auth?.currentUser || !db || !["coach", "club_admin", "superadmin"].includes(manager.role)) throw new Error("Modification réservée aux responsables autorisés.");
+  if (!auth?.currentUser || !db || !["COACH", "CLUB_ADMIN", "SUPER_ADMIN"].includes(manager.role)) throw new Error("Modification réservée aux responsables autorisés.");
   const snapshot = await getDoc(doc(db, "users", athleteUid));
-  if (!snapshot.exists() || snapshot.data().role !== "athlete") throw new Error("Athlète introuvable.");
+  if (!snapshot.exists() || snapshot.data().role !== "ATHLETE") throw new Error("Athlète introuvable.");
   const current = createUserProfile(snapshot.id, typeof snapshot.data().email === "string" ? snapshot.data().email : null, snapshot.data());
-  const allowed = manager.role === "superadmin" || (manager.role === "club_admin" && Boolean(manager.clubId && manager.clubId === current.clubId)) || (manager.role === "coach" && current.coachId === manager.uid);
+  const allowed = manager.role === "SUPER_ADMIN" || (manager.role === "CLUB_ADMIN" && Boolean(manager.clubId && manager.clubId === current.clubId)) || (manager.role === "COACH" && current.coachId === manager.uid);
   if (!allowed) throw new Error("Vous n’êtes pas autorisé à modifier cet athlète.");
   if (values.disciplines && values.primaryDiscipline && !values.disciplines.includes(values.primaryDiscipline)) throw new Error("Discipline principale invalide.");
   await updateDoc(doc(db, "users", athleteUid), { ...values, categoryOverrideBy: manager.uid, updatedAt: serverTimestamp() });
@@ -126,5 +126,6 @@ export async function getAssociatedCoach(profile: UserProfile): Promise<UserProf
   const snapshot = await getDoc(doc(db, "users", profile.coachId));
   if (!snapshot.exists()) return null;
   const coach = createUserProfile(snapshot.id, typeof snapshot.data().email === "string" ? snapshot.data().email : null, snapshot.data());
-  return coach.role === "coach" ? coach : null;
+  return coach.role === "COACH" ? coach : null;
 }
+

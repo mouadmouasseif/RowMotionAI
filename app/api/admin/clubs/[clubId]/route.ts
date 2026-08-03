@@ -24,7 +24,7 @@ export async function DELETE(
 ) {
   try {
     const actor = await requireApiUser(request);
-    if (actor.role !== "superadmin") throw new Error("FORBIDDEN");
+    if (actor.role !== "SUPER_ADMIN") throw new Error("FORBIDDEN");
     const { clubId } = await context.params;
     const { db } = getAdminServices();
     const reference = db.doc(`clubs/${clubId}`);
@@ -38,7 +38,7 @@ export async function DELETE(
     members.docs.forEach((row) =>
       batch.update(row.ref, {
         clubId: null,
-        coachId: row.data().role === "athlete" ? null : row.data().coachId ?? null,
+        coachId: row.data().role === "ATHLETE" ? null : row.data().coachId ?? null,
         updatedAt: FieldValue.serverTimestamp(),
       }),
     );

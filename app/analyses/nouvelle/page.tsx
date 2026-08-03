@@ -11,7 +11,7 @@ import { createAnalysis, updateAnalysis } from "@/services/analysis-service";
 import { saveLocalAnalysisVideo } from "@/services/local-video-service";
 import { analyzeLocalVideo } from "@/services/local-pose-analysis-service";
 import { inspectAnalysisVideo, MAX_VIDEO_SIZE_MB } from "@/services/storage-service";
-import type { AnalysisDistanceType, AnalysisEnvironment, AnalysisScope } from "@/types/analysis";
+import type { AnalysisDistanceType, AnalysisEnvironment, AnalysisScope, AnalysisTimelines, JointAngleRange, MetricSample, MuscleUsage } from "@/types/analysis";
 import type { UserProfile } from "@/types/user";
 
 const analysisTypeOptions: { value: AnalysisDistanceType; label: string; meters?: number }[] = [
@@ -29,6 +29,40 @@ const analysisTypeOptions: { value: AnalysisDistanceType; label: string; meters?
   { value: "training", label: "Entrainement" },
   { value: "competition", label: "Competition" },
 ];
+
+function buildRange(samples: MetricSample[]): JointAngleRange {
+  const values = samples.map((sample) => sample.value).filter((value) => Number.isFinite(value));
+  if (!values.length) return { min: null, max: null, amplitude: null, measurementSource: "camera", confidence: null };
+  const min = Math.round(Math.min(...values) * 10) / 10;
+  const max = Math.round(Math.max(...values) * 10) / 10;
+  return { min, max, amplitude: Math.round((max - min) * 10) / 10, measurementSource: "camera", confidence: null };
+}
+
+function buildJointRanges(timelines: AnalysisTimelines) {
+  return {
+    knee: buildRange(timelines.kneeAngle),
+    hip: buildRange(timelines.hipAngle),
+    trunk: buildRange(timelines.backAngle),
+    elbow: buildRange(timelines.elbowAngle ?? []),
+    shoulder: buildRange(timelines.shoulderAngle ?? []),
+    wrist: { min: null, max: null, amplitude: null, measurementSource: "camera", confidence: null },
+  } satisfies Record<string, JointAngleRange>;
+}
+
+function buildMuscleEstimation(muscleUsage: MuscleUsage) {
+  return {
+    groups: {
+      Dos: muscleUsage.back,
+      Jambes: muscleUsage.legs,
+      Bras: muscleUsage.arms,
+      Gainage: muscleUsage.core,
+      Epaules: muscleUsage.shoulders,
+    },
+    note: "Contribution musculaire estimee depuis les amplitudes articulaires, la posture et la regularite. Ce n'est pas une mesure EMG directe.",
+    measurementSource: "estimated" as const,
+    confidence: null,
+  };
+}
 
 function Content() {
   const { profile } = useAuth();
@@ -130,6 +164,8 @@ function Content() {
         phases: result.phases,
         timelines: result.timelines,
         muscleUsage: result.muscleUsage,
+        biomechanics: { jointRanges: buildJointRanges(result.timelines) },
+        muscleEstimation: buildMuscleEstimation(result.muscleUsage),
         crewAnalysis: result.crewAnalysis,
         metricsSource: "biomechanics_engine",
         progress: {
@@ -257,11 +293,11 @@ function Content() {
           <label className="upload-zone">
             <Upload />
             <strong>Choisir une vidéo</strong>
-            <small>MP4, MOV, WebM ou AVI · {MAX_VIDEO_SIZE_MB} Mo maximum</small>
+            <small>MP4, MOV, M4V, WebM ou AVI · {MAX_VIDEO_SIZE_MB} Mo maximum</small>
             <input
               aria-label="Importer une vidéo"
               type="file"
-              accept="video/mp4,video/quicktime,video/webm,video/x-msvideo"
+              accept="video/*,.mp4,.mov,.m4v,.webm,.avi"
               onChange={(event) => {
                 const selected = event.target.files?.[0];
                 if (selected) void choose(selected);

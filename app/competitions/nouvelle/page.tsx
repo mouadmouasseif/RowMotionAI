@@ -235,8 +235,9 @@ function NewCompetitionContent() {
 }
 export default function NewCompetitionPage() {
   return (
-    <ProtectedPage allowedRoles={["coach", "club_admin", "superadmin"]}>
+    <ProtectedPage allowedRoles={["COACH", "CLUB_ADMIN", "SUPER_ADMIN"]}>
       <NewCompetitionContent />
     </ProtectedPage>
   );
 }
+

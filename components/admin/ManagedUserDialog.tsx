@@ -108,7 +108,7 @@ export function ManagedUserDialog({
         sportStatus: form.sportStatus as UserProfile["sportStatus"],
         active: form.active,
         clubId: form.clubId || null,
-        coachId: user.role === "athlete" ? form.coachId || null : null,
+        coachId: user.role === "ATHLETE" ? form.coachId || null : null,
       };
       await updateManagedUser(user.uid, values);
       await onSaved();
@@ -132,7 +132,7 @@ export function ManagedUserDialog({
         <header>
           <div>
             <h2 id="managed-user-title">
-              Modifier {user.role === "athlete" ? "l’athlète" : "le coach"}
+              Modifier {user.role === "ATHLETE" ? "l’athlète" : "le coach"}
             </h2>
             <p>Toutes les informations et affectations sont modifiables par le Super administrateur.</p>
           </div>
@@ -152,7 +152,7 @@ export function ManagedUserDialog({
             <label>Genre<select value={form.gender} onChange={(event) => update("gender", event.target.value as ProfileGender)}><option value="not_specified">Non renseigné</option><option value="male">Homme</option><option value="female">Femme</option><option value="other">Autre</option></select></label>
             <label>Niveau<input value={form.level} onChange={(event) => update("level", event.target.value)} /></label>
             <label>Club<select value={form.clubId} onChange={(event) => setForm((current) => ({ ...current, clubId: event.target.value, coachId: "" }))}><option value="">Sans club</option>{clubs.map((club) => <option value={club.id} key={club.id}>{club.name}</option>)}</select></label>
-            {user.role === "athlete" && (
+            {user.role === "ATHLETE" && (
               <>
                 <label>Coach affecté<select value={form.coachId} disabled={!form.clubId} onChange={(event) => update("coachId", event.target.value)}><option value="">Sans coach</option>{availableCoaches.map((coach) => <option value={coach.uid} key={coach.uid}>{coach.firstName} {coach.lastName}</option>)}</select></label>
                 <label>Catégorie officielle<select value={form.officialCategory} onChange={(event) => update("officialCategory", event.target.value)}><option value="">Catégorie calculée</option>{["U15", "U19", "U21", "U23", "SENIOR"].map((category) => <option key={category}>{category}</option>)}</select></label>
@@ -163,7 +163,7 @@ export function ManagedUserDialog({
                 <label>Statut sportif<select value={form.sportStatus} onChange={(event) => update("sportStatus", event.target.value as UserProfile["sportStatus"])}><option value="active">Actif</option><option value="injured">Blessé</option><option value="inactive">Inactif</option><option value="archived">Archivé</option></select></label>
               </>
             )}
-            {user.role === "coach" && (
+            {user.role === "COACH" && (
               <label className="wide">Spécialité<input value={form.specialty} onChange={(event) => update("specialty", event.target.value)} /></label>
             )}
             <label>Compte<select value={form.active ? "active" : "inactive"} onChange={(event) => update("active", event.target.value === "active")}><option value="active">Actif</option><option value="inactive">Inactif</option></select></label>

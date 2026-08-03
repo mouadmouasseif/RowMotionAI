@@ -2,13 +2,14 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Bell, ChevronDown, LogOut, Menu, Radio, Upload, X } from "lucide-react";
+import { Bell, ChevronDown, FileBarChart, LogOut, Menu, Radio, Upload, X } from "lucide-react";
 import { useState } from "react";
 import { Brand } from "@/components/Brand";
 import { ProfileAvatar } from "@/components/profile/ProfileAvatar";
 import { InstallButton } from "@/components/pwa/InstallButton";
-import { navigationSections } from "@/lib/navigation";
+import { navigationByRole } from "@/config/role-navigation";
 import { useAuth } from "@/providers/AuthProvider";
+import type { UserRole } from "@/types/user";
 
 interface AppShellProps {
   children: React.ReactNode;
@@ -19,12 +20,22 @@ interface AppShellProps {
   headerActions?: React.ReactNode;
 }
 
-const roleLabels = {
-  athlete: "Athlète",
-  coach: "Entraîneur",
-  club_admin: "Administrateur",
-  superadmin: "Super administrateur",
-} as const;
+const roleLabels: Record<UserRole, string> = {
+  ATHLETE: "ATHLETE",
+  COACH: "COACH",
+  CLUB_ADMIN: "Admin Club",
+  TECHNICAL_DIRECTOR: "Directeur Technique",
+  SUPER_ADMIN: "SUPER_ADMIN",
+  JURY: "Jury",
+};
+
+function defaultActionForRole(role: UserRole) {
+  if (role === "TECHNICAL_DIRECTOR") return { href: "/rapports", label: "Rapport technique", icon: FileBarChart };
+  if (role === "CLUB_ADMIN") return { href: "/rapports", label: "Exporter rapport", icon: FileBarChart };
+  if (role === "SUPER_ADMIN") return { href: "/rapports", label: "Rapport global", icon: FileBarChart };
+  if (role === "JURY") return { href: "/jury/dashboard", label: "Acceder au live", icon: Radio };
+  return { href: "/analyses/nouvelle", label: "Importer une video", icon: Upload };
+}
 
 export function AppShell({
   children,
@@ -41,131 +52,94 @@ export function AppShell({
 
   if (!profile) return null;
 
-  const name = `${profile.firstName} ${profile.lastName}`.trim() || profile.email;
+  const name = `${profile.firstName} ${profile.lastName}`.trim() || profile.displayName || profile.email;
+  const navigationSections = navigationByRole[profile.role];
+  const primaryAction = defaultActionForRole(profile.role);
+  const PrimaryIcon = primaryAction.icon;
+  const useReferenceLayout = Boolean(dashboardMode || referenceMode || true);
+
   const handleLogout = async () => {
     await logout();
     router.replace("/");
   };
 
-  // Every authenticated page shares this single menu and shell.
-  const useReferenceLayout = Boolean(dashboardMode || referenceMode || true);
-
   return (
     <main className={`dashboard-page${useReferenceLayout ? " dashboard-reference" : ""}`}>
-      {mobileOpen && (
-        <button
-          className="mobile-overlay"
-          aria-label="Fermer le menu"
-          onClick={() => setMobileOpen(false)}
-        />
-      )}
+      {mobileOpen && <button className="mobile-overlay" aria-label="Fermer le menu" onClick={() => setMobileOpen(false)} />}
       <aside className={`sidebar ${mobileOpen ? "mobile-open" : ""}`}>
         <Brand compact />
-        {useReferenceLayout && (
-          <Link className="sidebar-profile" href="/profil">
-            <span className="sidebar-avatar">
-              <ProfileAvatar
-                photoUrl={profile.profilePhotoUrl}
-                firstName={profile.firstName}
-                lastName={profile.lastName}
-              />
-              <i />
-            </span>
-            <span>
-              <strong>{name}</strong>
-              <small>{roleLabels[profile.role]}</small>
-            </span>
-            <ChevronDown />
-          </Link>
-        )}
+        <Link className="sidebar-profile" href="/profil">
+          <span className="sidebar-avatar">
+            <ProfileAvatar photoUrl={profile.profilePhotoUrl} firstName={profile.firstName} lastName={profile.lastName} />
+            <i />
+          </span>
+          <span>
+            <strong>{name}</strong>
+            <small>{roleLabels[profile.role]}</small>
+          </span>
+          <ChevronDown />
+        </Link>
         <nav>
-          {navigationSections.map((section) => {
-            const items = section.items.filter((item) => item.roles.includes(profile.role));
-            if (items.length === 0) return null;
-            return (
-              <section className="sidebar-section" key={section.label}>
-                <h2>{section.label}</h2>
-                {items.map(({ href, label, icon: Icon }) => (
-                  <Link
-                    key={href}
-                    onClick={() => setMobileOpen(false)}
-                    className={
-                      pathname === href ||
-                      (href !== "/tableau-de-bord" && pathname.startsWith(`${href}/`))
-                        ? "current"
-                        : ""
-                    }
-                    href={href}
-                  >
-                    <Icon />
-                    {label}
-                  </Link>
-                ))}
-              </section>
-            );
-          })}
+          {navigationSections.map((section) => (
+            <section className="sidebar-section" key={section.label}>
+              <h2>{section.label}</h2>
+              {section.items.map(({ href, label, icon: Icon }) => (
+                <Link
+                  key={`${section.label}-${label}-${href}`}
+                  onClick={() => setMobileOpen(false)}
+                  className={pathname === href || (href !== "/" && pathname.startsWith(`${href}/`)) ? "current" : ""}
+                  href={href}
+                >
+                  <Icon />
+                  {label}
+                </Link>
+              ))}
+            </section>
+          ))}
         </nav>
         {pathname !== "/parametres" && <InstallButton compact />}
         <button className="logout" onClick={() => void handleLogout()}>
           <LogOut />
-          Se déconnecter
+          Se deconnecter
         </button>
       </aside>
 
       <section className="dashboard-main">
         <header className="dash-header">
-          <button
-            className="dash-menu"
-            aria-label={mobileOpen ? "Fermer le menu" : "Ouvrir le menu"}
-            onClick={() => setMobileOpen((value) => !value)}
-          >
+          <button className="dash-menu" aria-label={mobileOpen ? "Fermer le menu" : "Ouvrir le menu"} onClick={() => setMobileOpen((value) => !value)}>
             {mobileOpen ? <X /> : <Menu />}
           </button>
           <div className="dash-heading">
-            {useReferenceLayout ? (
-              <>
-                <h1>{title}</h1>
-                <small>{subtitle ?? "RowMotion AI"}</small>
-              </>
-            ) : (
-              <>
-                <small>{subtitle ?? "RowMotion AI"}</small>
-                <h1>{title}</h1>
-              </>
-            )}
+            <h1>{title}</h1>
+            <small>{subtitle ?? "RowMotion AI"}</small>
           </div>
           {headerActions ? (
             <div className="dashboard-header-actions">{headerActions}</div>
           ) : dashboardMode ? (
             <div className="dashboard-header-actions">
-              <Link className="button primary" href="/analyses/nouvelle">
-                <Upload />
-                Importer une vidéo
+              <Link className="button primary" href={primaryAction.href}>
+                <PrimaryIcon />
+                {primaryAction.label}
               </Link>
-              <Link className="button ghost" href="/analyses/live">
-                <Radio />
-                Analyse en direct
-              </Link>
+              {(profile.role === "ATHLETE" || profile.role === "COACH") && (
+                <Link className="button ghost" href="/analyses/live">
+                  <Radio />
+                  Analyse en direct
+                </Link>
+              )}
               <Link className="dashboard-bell" href="/notifications" aria-label="Notifications">
                 <Bell />
-                <span>3</span>
               </Link>
             </div>
           ) : (
             <div className="dash-profile">
-              <Link className="icon-link" href="/notifications" aria-label="Notifications">
-                <Bell />
-              </Link>
+              <Link className="icon-link" href="/notifications" aria-label="Notifications"><Bell /></Link>
               <Link className="avatar-link" href="/profil">
-                <ProfileAvatar
-                  photoUrl={profile.profilePhotoUrl}
-                  firstName={profile.firstName}
-                  lastName={profile.lastName}
-                />
+                <ProfileAvatar photoUrl={profile.profilePhotoUrl} firstName={profile.firstName} lastName={profile.lastName} />
               </Link>
               <div>
                 <strong>{name}</strong>
-                <small>{profile.role}</small>
+                <small>{roleLabels[profile.role]}</small>
               </div>
             </div>
           )}
@@ -175,3 +149,4 @@ export function AppShell({
     </main>
   );
 }
+

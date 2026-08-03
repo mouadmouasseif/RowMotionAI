@@ -21,7 +21,7 @@ export interface AnalysisProgress {
 }
 
 export type MetricUnit = "deg" | "percent" | "spm" | "watt" | "m" | "m/s" | "s";
-export interface MeasurementMeta { measurementSource: MeasurementSource; confidence: number }
+export interface MeasurementMeta { measurementSource: MeasurementSource; confidence: number | null }
 export interface MetricValue { value: number | null; unit: MetricUnit; confidence: number; source: "pose" | "manual" | "sensor" | "estimated"; measurementSource?: MeasurementSource }
 export interface AnalysisMetrics {
   backAngle: number | null; kneeAngle: number | null; hipAngle: number | null;

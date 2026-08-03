@@ -48,7 +48,7 @@ function CoachesContent() {
     const [coaches, managedAthletes, availableClubs] = await Promise.all([
       listCoaches(profile),
       listAthletes(profile),
-      profile.role === "superadmin" ? listClubs(profile) : Promise.resolve([]),
+      profile.role === "SUPER_ADMIN" ? listClubs(profile) : Promise.resolve([]),
     ]);
     setItems(coaches);
     setAthletes(managedAthletes);
@@ -146,7 +146,7 @@ function CoachesContent() {
                     />
                     <span>
                       <strong>{coach.firstName} {coach.lastName}</strong>
-                      <small>{coach.specialty ?? "Coach"}</small>
+                      <small>{coach.specialty ?? "COACH"}</small>
                     </span>
                   </div>
                   <span>
@@ -163,7 +163,7 @@ function CoachesContent() {
                   <span>{formatDate(coach.createdAt)}</span>
                   <span className="directory-actions">
                     <Link href={`/coaches/${coach.uid}`} aria-label={`Voir ${coach.firstName}`}><Eye /></Link>
-                    {profile.role === "superadmin" ? (
+                    {profile.role === "SUPER_ADMIN" ? (
                       <>
                         <button
                           aria-label={`Modifier ${coach.firstName}`}
@@ -227,8 +227,9 @@ function CoachesContent() {
 
 export default function CoachesPage() {
   return (
-    <ProtectedPage allowedRoles={["club_admin", "superadmin"]}>
+    <ProtectedPage allowedRoles={["CLUB_ADMIN", "SUPER_ADMIN"]}>
       <CoachesContent />
     </ProtectedPage>
   );
 }
+

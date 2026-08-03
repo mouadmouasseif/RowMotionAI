@@ -10,18 +10,20 @@ function requireFirebase() {
 }
 
 export function canAccessAnalysis(profile: UserProfile, analysis: RowingAnalysis) {
-  if (profile.role === "superadmin") return true;
-  if (profile.role === "club_admin") return Boolean(profile.clubId && profile.clubId === analysis.clubId);
-  if (profile.role === "coach") return profile.uid === analysis.coachId || profile.uid === analysis.createdBy;
+  if (profile.role === "SUPER_ADMIN") return true;
+  if (profile.role === "TECHNICAL_DIRECTOR") return Boolean((profile.technicalScope?.clubIds ?? [profile.clubId]).includes(analysis.clubId ?? ""));
+  if (profile.role === "CLUB_ADMIN") return Boolean(profile.clubId && profile.clubId === analysis.clubId);
+  if (profile.role === "COACH") return profile.uid === analysis.coachId || profile.uid === analysis.createdBy;
   return profile.uid === analysis.athleteId;
 }
 
 export async function listAnalyses(profile: UserProfile, max = 100): Promise<RowingAnalysis[]> {
   const { database } = requireFirebase();
   const base = collection(database, "analyses");
-  const constraints = profile.role === "superadmin" ? [orderBy("createdAt", "desc"), limit(max)]
-    : profile.role === "club_admin" && profile.clubId ? [where("clubId", "==", profile.clubId), limit(max)]
-    : profile.role === "coach" ? [where("coachId", "==", profile.uid), limit(max)]
+  const constraints = profile.role === "SUPER_ADMIN" ? [orderBy("createdAt", "desc"), limit(max)]
+    : profile.role === "TECHNICAL_DIRECTOR" && (profile.technicalScope?.clubIds[0] ?? profile.clubId) ? [where("clubId", "==", profile.technicalScope?.clubIds[0] ?? profile.clubId), limit(max)]
+    : profile.role === "CLUB_ADMIN" && profile.clubId ? [where("clubId", "==", profile.clubId), limit(max)]
+    : profile.role === "COACH" ? [where("coachId", "==", profile.uid), limit(max)]
     : [where("athleteId", "==", profile.uid), limit(max)];
   const snapshot = await getDocs(query(base, ...constraints));
   return snapshot.docs.map((item) => normalizeAnalysis({ id: item.id, ...item.data() } as RowingAnalysis));
@@ -40,7 +42,7 @@ export async function createAnalysis(input: { athleteId: string; athleteName: st
   const { database, user } = requireFirebase();
   const reference = await addDoc(collection(database, "analyses"), {
     athleteId: input.athleteId, athleteName: input.athleteName,
-    coachId: input.profile.role === "coach" ? input.profile.uid : input.profile.coachId,
+    coachId: input.profile.role === "COACH" ? input.profile.uid : input.profile.coachId,
     clubId: input.profile.clubId, createdBy: user.uid, sourceType: input.sourceType,
     environment: input.environment, rowingType: input.environment, trainingType: input.trainingType ?? "technique", analysisScope: input.analysisScope ?? "complete", analysisType: input.analysisType ?? "free_technique", distance: input.distance ?? null, status: input.sourceType === "video" ? "uploading" : "draft",
     progress: { ...initialAnalysisProgress, status: input.sourceType === "video" ? "uploading" : "draft", currentStep: input.sourceType === "video" ? "upload" : "validation" },
@@ -80,7 +82,7 @@ export async function updateAnalysis(id: string, values: Partial<RowingAnalysis>
 
 export async function removeAnalysis(id: string, profile: UserProfile) {
   const analysis = await getAnalysis(id, profile);
-  if (profile.role === "athlete" && analysis.status === "processing") throw new Error("Une analyse en cours ne peut pas être supprimée.");
+  if (profile.role === "ATHLETE" && analysis.status === "processing") throw new Error("Une analyse en cours ne peut pas être supprimée.");
   const { database } = requireFirebase();
   await deleteDoc(doc(database, "analyses", id));
   return analysis;
