@@ -23,6 +23,46 @@ function valueLabel(value: number | null, unit: string, digits = 1) {
   return value == null ? "Non mesuré" : `${value.toFixed(digits)} ${unit}`.trim();
 }
 
+function optionalValueLabel(value: number | null | undefined, unit: string, digits = 1) {
+  return value == null ? "Non disponible" : `${value.toFixed(digits)} ${unit}`.trim();
+}
+
+function muscleRows(analysis: RowingAnalysis): Array<[string, string]> {
+  const estimation = analysis.muscleEstimation?.groups;
+  if (estimation && Object.keys(estimation).length) {
+    return Object.entries(estimation).map(([label, value]) => [label, optionalValueLabel(value, "%")]);
+  }
+  if (analysis.muscleUsage) {
+    return [
+      ["Dos", optionalValueLabel(analysis.muscleUsage.back, "%")],
+      ["Jambes", optionalValueLabel(analysis.muscleUsage.legs, "%")],
+      ["Bras", optionalValueLabel(analysis.muscleUsage.arms, "%")],
+      ["Gainage", optionalValueLabel(analysis.muscleUsage.core, "%")],
+      ["Epaules", optionalValueLabel(analysis.muscleUsage.shoulders, "%")],
+    ];
+  }
+  return [["Utilisation musculaire", "Non disponible"]];
+}
+
+function jointRangeRows(analysis: RowingAnalysis): Array<[string, string]> {
+  const ranges = analysis.biomechanics?.jointRanges ?? {};
+  const joints = [
+    ["Genou", "knee"],
+    ["Hanche", "hip"],
+    ["Tronc", "trunk"],
+    ["Coude", "elbow"],
+    ["Epaule", "shoulder"],
+    ["Poignet", "wrist"],
+  ] as const;
+  return joints.map(([label, key]) => {
+    const range = ranges[key];
+    return [
+      label,
+      `Min ${optionalValueLabel(range?.min, "deg")} - Max ${optionalValueLabel(range?.max, "deg")} - Amplitude ${optionalValueLabel(range?.amplitude, "deg")}`,
+    ];
+  });
+}
+
 function pageWidth(doc: PdfDocument) {
   return doc.internal.pageSize.getWidth();
 }
@@ -135,7 +175,20 @@ export async function createAnalysisPdf(analysis: RowingAnalysis) {
     ["Angle des coudes", valueLabel(metrics.elbowAngle, "°")],
   ], y);
 
-  y = sectionTitle(doc, "Points à surveiller", y + 2);
+  y = sectionTitle(doc, "Muscle & Power - Exploration", y + 2);
+  y = keyValues(doc, [
+    ...muscleRows(analysis),
+    ["Source", analysis.muscleEstimation?.measurementSource ?? (analysis.muscleUsage ? "estimated" : "unavailable")],
+    ["Confiance", analysis.muscleEstimation ? `${analysis.muscleEstimation.confidence}%` : "Non disponible"],
+  ], y);
+  y = textList(doc, [
+    analysis.muscleEstimation?.note ?? "Estimated muscular contribution - estimated from biomechanics, not direct EMG measurement.",
+  ], y);
+
+  y = sectionTitle(doc, "Angles minimum / maximum", y + 2);
+  y = keyValues(doc, jointRangeRows(analysis), y);
+
+  y = sectionTitle(doc, "Points a surveiller", y + 2);
   y = textList(doc, analysis.errors ?? [], y);
   y = sectionTitle(doc, "Recommandations", y + 2);
   textList(doc, analysis.recommendations ?? [], y);

@@ -1,7 +1,7 @@
 import { addDoc, collection, deleteDoc, doc, getDoc, getDocs, limit, onSnapshot, orderBy, query, serverTimestamp, updateDoc, where } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
 import { normalizeAnalysis } from "@/lib/analysis/normalize-analysis";
-import { emptyAnalysisMetrics, initialAnalysisProgress, type AnalysisEnvironment, type AnalysisScope, type AnalysisSource, type AnalysisTrainingType, type RowingAnalysis } from "@/types/analysis";
+import { emptyAnalysisMetrics, initialAnalysisProgress, type AnalysisDistanceType, type AnalysisEnvironment, type AnalysisScope, type AnalysisSource, type AnalysisTrainingType, type RowingAnalysis } from "@/types/analysis";
 import type { UserProfile } from "@/types/user";
 
 function requireFirebase() {
@@ -36,17 +36,17 @@ export async function getAnalysis(id: string, profile: UserProfile): Promise<Row
   return analysis;
 }
 
-export async function createAnalysis(input: { athleteId: string; athleteName: string; environment: AnalysisEnvironment; sourceType: AnalysisSource; trainingType?: AnalysisTrainingType; analysisScope?: AnalysisScope; profile: UserProfile; fileName?: string }) {
+export async function createAnalysis(input: { athleteId: string; athleteName: string; environment: AnalysisEnvironment; sourceType: AnalysisSource; trainingType?: AnalysisTrainingType; analysisScope?: AnalysisScope; analysisType?: AnalysisDistanceType; distance?: number | null; profile: UserProfile; fileName?: string }) {
   const { database, user } = requireFirebase();
   const reference = await addDoc(collection(database, "analyses"), {
     athleteId: input.athleteId, athleteName: input.athleteName,
     coachId: input.profile.role === "coach" ? input.profile.uid : input.profile.coachId,
     clubId: input.profile.clubId, createdBy: user.uid, sourceType: input.sourceType,
-    environment: input.environment, trainingType: input.trainingType ?? "technique", analysisScope: input.analysisScope ?? "complete", status: input.sourceType === "video" ? "uploading" : "draft",
+    environment: input.environment, rowingType: input.environment, trainingType: input.trainingType ?? "technique", analysisScope: input.analysisScope ?? "complete", analysisType: input.analysisType ?? "free_technique", distance: input.distance ?? null, status: input.sourceType === "video" ? "uploading" : "draft",
     progress: { ...initialAnalysisProgress, status: input.sourceType === "video" ? "uploading" : "draft", currentStep: input.sourceType === "video" ? "upload" : "validation" },
     videoUrl: null, storagePath: null, videoStorageMode: "none", thumbnailUrl: null, fileName: input.fileName ?? null,
     durationSeconds: null, technicalScore: null, metrics: emptyAnalysisMetrics,
-    phases: {}, errors: [], recommendations: [], coachComment: null,
+    phases: {}, splits: [], racePhases: [], strokes: [], turns: [], errors: [], recommendations: [], coachComment: null,
     createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
   });
   return reference.id;

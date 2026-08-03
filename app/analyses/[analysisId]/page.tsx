@@ -36,7 +36,7 @@ import {
 import type { AnalysisMetrics, MetricSample, MuscleUsage, RowingAnalysis, StrokeCycle } from "@/types/analysis";
 
 type ComparisonMode = "general" | "video" | "training";
-type AnalysisTab = "summary" | "phases" | "technique" | "performance" | "comparison";
+type AnalysisTab = "summary" | "timeline" | "stroke" | "phases" | "race" | "start" | "finish" | "turns" | "technique" | "performance" | "muscle" | "fatigue" | "comparison" | "coach";
 type MetricKey = keyof AnalysisMetrics | "technicalScore" | "durationSeconds";
 
 interface MetricDefinition {
@@ -154,14 +154,7 @@ function measuredLabel(value: number | null, unit: string) {
 
 function muscleUsageFor(analysis: RowingAnalysis): MuscleUsage {
   if (analysis.muscleUsage) return analysis.muscleUsage;
-  const clamp = (value: number) => Math.round(Math.max(0, Math.min(100, value)));
-  return {
-    back: clamp(100 - Math.abs((analysis.metrics?.backAngle ?? 25) - 22) * 1.35),
-    legs: clamp(45 + (analysis.metrics?.sequenceScore ?? 60) * 0.5),
-    arms: clamp(40 + Math.abs((analysis.metrics?.elbowAngle ?? 120) - 90) * 0.45),
-    core: clamp((analysis.metrics?.symmetryScore ?? 60) * 0.58 + (analysis.metrics?.rhythmScore ?? 60) * 0.42),
-    shoulders: clamp(40 + Math.abs((analysis.metrics?.shoulderAngle ?? 70) - 45) * 0.55),
-  };
+  return { back: 0, legs: 0, arms: 0, core: 0, shoulders: 0 };
 }
 
 function PhaseSpeedChart({ analysis }: { analysis: RowingAnalysis }) {
@@ -231,6 +224,91 @@ function displayCycles(analysis: RowingAnalysis): StrokeCycle[] {
       confidence,
     };
   });
+}
+
+function formatNullable(value: number | null | undefined, unit = "") {
+  return value == null ? "Non disponible" : `${value.toFixed(unit === "s" ? 2 : 1)} ${unit}`.trim();
+}
+
+function distanceSegments(analysis: RowingAnalysis) {
+  if (analysis.splits?.length) return analysis.splits.map((split) => ({ label: `${split.startDistance}-${split.endDistance} m`, start: split.startDistance, end: split.endDistance }));
+  const distance = analysis.distance ?? (analysis.analysisType?.endsWith("m") ? Number.parseInt(analysis.analysisType, 10) : null);
+  if (!distance) return [];
+  if (distance === 2000) {
+    return [
+      { label: "Depart", start: 0, end: 100 },
+      { label: "Phase de lancement", start: 100, end: 500 },
+      { label: "Stabilisation", start: 500, end: 1000 },
+      { label: "Phase centrale", start: 1000, end: 1500 },
+      { label: "Preparation finish", start: 1500, end: 1750 },
+      { label: "Finish", start: 1750, end: 2000 },
+    ];
+  }
+  const step = distance <= 1000 ? Math.min(250, distance) : 500;
+  return Array.from({ length: Math.ceil(distance / step) }, (_, index) => {
+    const start = index * step;
+    const end = Math.min(distance, start + step);
+    return { label: `${start}-${end} m`, start, end };
+  });
+}
+
+function EmptyAdvanced({ label }: { label: string }) {
+  return <div className="advanced-empty"><strong>{label}</strong><p>Non disponible. Aucune donnee mesuree ou estimee avec source et confiance reste enregistree pour cette analyse.</p></div>;
+}
+
+function AdvancedAnalysisPanel({ analysis, tab }: { analysis: RowingAnalysis; tab: AnalysisTab }) {
+  const segments = distanceSegments(analysis);
+  if (tab === "timeline") {
+    return (
+      <section className="advanced-analysis-card">
+        <h2>Timeline interactive</h2>
+        <div className="distance-timeline">
+          {segments.length ? segments.map((segment) => <button key={`${segment.start}-${segment.end}`}>{segment.start}m<span>{segment.label}</span></button>) : <span>Distance non disponible</span>}
+        </div>
+        <p>Les clics de split/phase sont prets pour la synchronisation video par timestamp des que les splits ou coups contiennent des temps exploitables.</p>
+      </section>
+    );
+  }
+  if (tab === "race") {
+    return (
+      <section className="advanced-analysis-card">
+        <h2>Race Phase Analysis</h2>
+        {analysis.racePhases?.length ? <div className="advanced-table">{analysis.racePhases.map((phase) => <article key={phase.name}><strong>{phase.name}</strong><span>{formatNullable(phase.distance, "m")}</span><span>{formatNullable(phase.duration, "s")}</span><span>{formatNullable(phase.power, "W")}</span><small>{phase.measurementSource} · {phase.confidence}%</small></article>)}</div> : <EmptyAdvanced label="Phases de course" />}
+      </section>
+    );
+  }
+  if (tab === "start") {
+    const start = analysis.startAnalysis;
+    return (
+      <section className="advanced-analysis-card">
+        <h2>Start Analysis</h2>
+        {start ? <><div className="score-grid"><article><small>Explosivite</small><strong>{formatNullable(start.scores.explosivity, "")}</strong></article><article><small>Synchronisation</small><strong>{formatNullable(start.scores.synchronization, "")}</strong></article><article><small>Cadence</small><strong>{formatNullable(start.scores.cadence, "")}</strong></article><article><small>Puissance</small><strong>{formatNullable(start.scores.power, "")}</strong></article><article><small>Technique</small><strong>{formatNullable(start.scores.technique, "")}</strong></article><article><small>Start Score</small><strong>{formatNullable(start.scores.overall, "/100")}</strong></article></div><div className="advanced-table">{start.strokes.slice(0, 10).map((stroke) => <article key={stroke.index}><strong>Stroke {stroke.index}</strong><span>{formatNullable(stroke.duration, "s")}</span><span>{formatNullable(stroke.power, "W")}</span><span>{formatNullable(stroke.acceleration, "m/s2")}</span><small>{stroke.measurementSource} · {stroke.confidence}%</small></article>)}</div></> : <EmptyAdvanced label="Start Analysis" />}
+      </section>
+    );
+  }
+  if (tab === "finish") {
+    return <section className="advanced-analysis-card"><h2>Finish Analysis</h2>{analysis.finishAnalysis ? <div className="score-grid"><article><small>Finish Score</small><strong>{formatNullable(analysis.finishAnalysis.score, "/100")}</strong></article><article><small>Source</small><strong>{analysis.finishAnalysis.measurementSource}</strong></article><article><small>Confiance</small><strong>{analysis.finishAnalysis.confidence}%</strong></article></div> : <EmptyAdvanced label="Finish Analysis" />}</section>;
+  }
+  if (tab === "turns") {
+    return <section className="advanced-analysis-card"><h2>Turn Analysis</h2>{analysis.turns?.length ? <div className="advanced-table">{analysis.turns.map((turn, index) => <article key={index}><strong>Turn {index + 1}</strong><span>{formatNullable(turn.entrySpeed, "m/s")}</span><span>{formatNullable(turn.minimumSpeed, "m/s")}</span><span>{formatNullable(turn.efficiencyScore, "/100")}</span><small>{turn.measurementSource} · {turn.confidence}%</small></article>)}</div> : <EmptyAdvanced label="Virages / tours" />}</section>;
+  }
+  if (tab === "stroke") {
+    const strokes = analysis.strokes?.length ? analysis.strokes : displayCycles(analysis).map((cycle) => ({ index: cycle.index + 1, timestampStart: cycle.startTime, timestampEnd: cycle.endTime, duration: cycle.duration, strokeRate: cycle.strokeRate, power: null, speed: null, acceleration: null, measurementSource: "camera" as const, confidence: Math.round(cycle.confidence * 100) }));
+    return <section className="advanced-analysis-card"><h2>Stroke Analysis</h2><div className="advanced-table">{strokes.slice(0, 12).map((stroke) => <article key={stroke.index}><strong>Stroke {stroke.index}</strong><span>{formatNullable(stroke.duration, "s")}</span><span>{formatNullable(stroke.strokeRate, "spm")}</span><span>{formatNullable(stroke.power, "W")}</span><small>{stroke.measurementSource} · {stroke.confidence}%</small></article>)}</div></section>;
+  }
+  if (tab === "muscle") {
+    const ranges = analysis.biomechanics?.jointRanges ?? {};
+    const estim = analysis.muscleEstimation;
+    return <section className="advanced-analysis-card"><h2>Muscle & Power</h2><p>Estimated muscular contribution. Estimated from biomechanics - not direct EMG measurement.</p><div className="joint-range-grid">{["knee", "hip", "trunk", "elbow", "shoulder", "wrist"].map((joint) => <article key={joint}><strong>{joint.toUpperCase()}</strong><span>Min : {formatNullable(ranges[joint]?.min, "deg")}</span><span>Max : {formatNullable(ranges[joint]?.max, "deg")}</span><span>Amplitude : {formatNullable(ranges[joint]?.amplitude, "deg")}</span></article>)}</div>{estim ? <div className="score-grid">{Object.entries(estim.groups).map(([name, value]) => <article key={name}><small>{name}</small><strong>{formatNullable(value, "%")}</strong></article>)}</div> : <EmptyAdvanced label="Contribution musculaire estimee" />}</section>;
+  }
+  if (tab === "fatigue") {
+    const fatigue = analysis.fatigue;
+    return <section className="advanced-analysis-card"><h2>Fatigue musculaire</h2>{fatigue ? <div className="score-grid"><article><small>Power Loss</small><strong>{formatNullable(fatigue.powerLoss, "%")}</strong></article><article><small>Stroke Length</small><strong>{formatNullable(fatigue.strokeLengthLoss, "%")}</strong></article><article><small>Technique Loss</small><strong>{formatNullable(fatigue.techniqueLoss, "%")}</strong></article><article><small>Fatigue Index</small><strong>{formatNullable(fatigue.index, "/100")}</strong></article></div> : <EmptyAdvanced label="Fatigue Index" />}</section>;
+  }
+  if (tab === "coach") {
+    return <section className="advanced-analysis-card"><h2>AI Coach</h2><div className="analysis-conclusion-grid"><article><strong>Points forts</strong><p>{analysis.recommendations?.[0] ?? "Non disponible tant que l'analyse ne contient pas assez de donnees exploitables."}</p></article><article><strong>Points a ameliorer</strong><p>{analysis.errors?.[0] ?? "Non disponible."}</p></article><article><strong>Priorite technique</strong><p>{analysis.recommendations?.[1] ?? "Maintenir la longueur du coup lorsque la cadence augmente, si cette tendance est confirmee par les mesures."}</p></article><article><strong>Priorite physique</strong><p>Non disponible sans puissance, fatigue ou capteur associe.</p></article></div></section>;
+  }
+  return null;
 }
 
 function Detail({ id }: { id: string }) {
@@ -362,6 +440,15 @@ function Detail({ id }: { id: string }) {
         ) : (
           <>
             <nav className="video-analysis-tabs">
+              <button className={tab === "timeline" ? "active" : ""} onClick={() => setTab("timeline")}>Timeline</button>
+              <button className={tab === "stroke" ? "active" : ""} onClick={() => setTab("stroke")}>Stroke Analysis</button>
+              <button className={tab === "race" ? "active" : ""} onClick={() => setTab("race")}>Race Phases</button>
+              <button className={tab === "start" ? "active" : ""} onClick={() => setTab("start")}>Start</button>
+              <button className={tab === "finish" ? "active" : ""} onClick={() => setTab("finish")}>Finish</button>
+              <button className={tab === "turns" ? "active" : ""} onClick={() => setTab("turns")}>Turns</button>
+              <button className={tab === "muscle" ? "active" : ""} onClick={() => setTab("muscle")}>Muscle & Power</button>
+              <button className={tab === "fatigue" ? "active" : ""} onClick={() => setTab("fatigue")}>Fatigue</button>
+              <button className={tab === "coach" ? "active" : ""} onClick={() => setTab("coach")}>AI Coach</button>
               <button className={tab === "summary" ? "active" : ""} onClick={() => setTab("summary")}>Résumé</button>
               {(analysis.analysisScope ?? "complete") === "complete" && <button className={tab === "phases" ? "active" : ""} onClick={() => setTab("phases")}>Phases du coup</button>}
               {(analysis.analysisScope ?? "complete") === "complete" && <button className={tab === "technique" ? "active" : ""} onClick={() => setTab("technique")}>Angles & technique</button>}
@@ -378,7 +465,28 @@ function Detail({ id }: { id: string }) {
               </div>
             )}
 
-            {tab !== "comparison" && (
+            <section className="advanced-score-strip">
+              {[
+                ["Technique Score", analysis.scores?.technique ?? analysis.technicalScore],
+                ["Power Score", analysis.scores?.power ?? null],
+                ["Efficiency Score", analysis.scores?.efficiency ?? null],
+                ["Symmetry Score", analysis.scores?.symmetry ?? analysis.metrics?.symmetryScore],
+                ["Start Score", analysis.scores?.start ?? analysis.startAnalysis?.scores.overall],
+                ["Finish Score", analysis.scores?.finish ?? analysis.finishAnalysis?.score],
+                ["Fatigue Index", analysis.scores?.fatigue ?? analysis.fatigue?.index],
+              ].map(([label, value]) => (
+                <article key={label}>
+                  <small>{label}</small>
+                  <strong>{typeof value === "number" ? value.toFixed(1) : "Non disponible"}</strong>
+                </article>
+              ))}
+            </section>
+
+            {["timeline", "stroke", "race", "start", "finish", "turns", "muscle", "fatigue", "coach"].includes(tab) && (
+              <AdvancedAnalysisPanel analysis={analysis} tab={tab} />
+            )}
+
+            {!["comparison", "timeline", "stroke", "race", "start", "finish", "turns", "muscle", "fatigue", "coach"].includes(tab) && (
               <>
               <div className={`video-analysis-layout ${tab}-view ${(analysis.analysisScope ?? "complete") === "general" ? "general-scope" : "complete-scope"}`}>
                 <main>
@@ -477,7 +585,7 @@ function Detail({ id }: { id: string }) {
                         ["Bras", muscleUsageFor(analysis).arms],
                         ["Gainage", muscleUsageFor(analysis).core],
                         ["Épaules", muscleUsageFor(analysis).shoulders],
-                      ] as const).map(([label, value]) => <article key={label}><span><strong>{label}</strong><b>{value}%</b></span><i><b style={{ width: `${value}%` }} /></i></article>)}
+                      ] as const).map(([label, value]) => <article key={label}><span><strong>{label}</strong><b>{analysis.muscleUsage ? `${value}%` : "Non disponible"}</b></span><i><b style={{ width: `${analysis.muscleUsage ? value : 0}%` }} /></i></article>)}
                     </div>
                     <p>Estimation biomécanique calculée depuis les amplitudes articulaires, la posture et la régularité. Une mesure physiologique exacte nécessite des capteurs EMG.</p>
                   </section>
