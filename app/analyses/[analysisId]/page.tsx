@@ -1,6 +1,7 @@
 "use client";
 
 import { use, useEffect, useMemo, useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import {
   Activity,
@@ -23,7 +24,8 @@ import {
 import { AnalysisVideoSource } from "@/components/AnalysisVideoSource";
 import { AppShell } from "@/components/AppShell";
 import { ProtectedPage } from "@/components/ProtectedPage";
-import { getDisplayJointRanges, getDisplayMuscleRows, getMuscleMeasurementMeta, jointDisplay, movementVisualPath } from "@/lib/analysis/biomechanics-display";
+import { canViewJointKey, restrictedBiomechanicsNotice } from "@/lib/analysis/biomechanics-access";
+import { getDisplayJointRanges, getDisplayMuscleRows, getMuscleMeasurementMeta, jointDisplay, muscleVisualKeyForLabel, muscleVisualOrder, muscleVisuals } from "@/lib/analysis/biomechanics-display";
 import { downloadAnalysisPdf } from "@/lib/report-pdf";
 import { useAuth } from "@/providers/AuthProvider";
 import {
@@ -35,6 +37,7 @@ import {
   updateAnalysis,
 } from "@/services/analysis-service";
 import type { AnalysisMetrics, MetricSample, MuscleUsage, RowingAnalysis, StrokeCycle } from "@/types/analysis";
+import type { UserRole } from "@/types/user";
 
 type ComparisonMode = "general" | "video" | "training";
 type AnalysisTab = "summary" | "timeline" | "stroke" | "phases" | "race" | "start" | "finish" | "turns" | "technique" | "performance" | "muscle" | "fatigue" | "comparison" | "COACH";
@@ -257,22 +260,40 @@ function EmptyAdvanced({ label }: { label: string }) {
   return <div className="advanced-empty"><strong>{label}</strong><p>Non disponible. Aucune donnee mesuree ou estimee avec source et confiance reste enregistree pour cette analyse.</p></div>;
 }
 
-function MovementVisualPanels({ environment }: { environment: RowingAnalysis["environment"] }) {
+function MuscleVisualCards({ muscles }: { muscles: Array<[string, number | null]> }) {
+  const rows = muscleVisualOrder.map((key) => {
+    const visual = muscleVisuals[key];
+    const measured = muscles.find(([label]) => muscleVisualKeyForLabel(label) === key);
+    return { key, label: measured?.[0] ?? visual.label, value: measured?.[1] ?? null, visual };
+  });
   return (
-    <div className="movement-visual-grid">
-      <article className={environment === "ergometer" ? "active" : ""}>
-        <span>Machine / Ergomètre</span>
-        <i style={{ backgroundImage: `url(${movementVisualPath})` }} aria-label="Activation musculaire en machine" />
-      </article>
-      <article className={environment !== "ergometer" ? "active" : ""}>
-        <span>Bateau</span>
-        <i style={{ backgroundImage: `url(${movementVisualPath})` }} aria-label="Mouvement musculaire en bateau" />
-      </article>
+    <div className="muscle-visual-card-grid">
+      {rows.map(({ key, label, value, visual }, index) => {
+        const percentage = value == null ? 0 : Math.min(100, Math.max(0, value));
+        return (
+          <article key={key} className="muscle-visual-card">
+            <div className="muscle-visual-body">
+              <Image src={visual.path} alt={`Activation musculaire - ${label}`} width={180} height={320} sizes="(max-width: 700px) 42vw, 170px" />
+            </div>
+            <div className="muscle-visual-metrics">
+              <span className="muscle-visual-ring" style={{ background: `conic-gradient(${visual.color} ${percentage * 3.6}deg, #12304a 0deg)` }}>
+                <b>{value == null ? "--" : `${Math.round(value)}%`}</b>
+              </span>
+              <i><b style={{ width: `${percentage}%`, background: visual.color }} /></i>
+              <svg viewBox="0 0 100 42" aria-hidden="true">
+                <path d={visual.trend} style={{ stroke: visual.color }} />
+                <path d={index < 3 ? "M 86 23 L 100 6 L 97 22 M 100 6 L 83 9" : "M 85 24 L 100 38 L 97 21 M 100 38 L 84 34"} style={{ stroke: visual.color }} />
+              </svg>
+            </div>
+            <strong>{label}</strong>
+          </article>
+        );
+      })}
     </div>
   );
 }
 
-function AdvancedAnalysisPanel({ analysis, tab }: { analysis: RowingAnalysis; tab: AnalysisTab }) {
+function AdvancedAnalysisPanel({ analysis, tab, viewerRole }: { analysis: RowingAnalysis; tab: AnalysisTab; viewerRole: UserRole }) {
   const segments = distanceSegments(analysis);
   if (tab === "timeline") {
     return (
@@ -316,13 +337,23 @@ function AdvancedAnalysisPanel({ analysis, tab }: { analysis: RowingAnalysis; ta
     const ranges = getDisplayJointRanges(analysis);
     const muscles = getDisplayMuscleRows(analysis);
     const meta = getMuscleMeasurementMeta(analysis);
+    const accessNotice = restrictedBiomechanicsNotice(viewerRole);
+    const visibleJoints = jointDisplay.filter((joint) => canViewJointKey(viewerRole, joint.key));
+    const postureRows = [
+      { key: "knee", label: "Angle du genou", value: analysis.metrics?.kneeAngle },
+      { key: "hip", label: "Angle de la hanche", value: analysis.metrics?.hipAngle },
+      { key: "trunk", label: "Inclinaison du dos", value: analysis.metrics?.backAngle },
+      { key: "shoulder", label: "Angle des épaules", value: analysis.metrics?.shoulderAngle },
+      { key: "elbow", label: "Angle des coudes", value: analysis.metrics?.elbowAngle },
+    ].filter((row) => canViewJointKey(viewerRole, row.key));
     return (
       <section className="advanced-analysis-card muscle-power-exploration">
         <h2>Muscle & Power - Exploration</h2>
         <p>Contribution musculaire estimee depuis la biomécanique. Ce n&apos;est pas une mesure EMG directe.</p>
-        <MovementVisualPanels environment={analysis.environment} />
+        {accessNotice && <p className="biomechanics-access-note">{accessNotice}</p>}
+        <MuscleVisualCards muscles={muscles} />
         <div className="joint-range-grid">
-          {jointDisplay.map((joint) => (
+          {visibleJoints.map((joint) => (
             <article key={joint.key}>
               <strong>{joint.label}</strong>
               <span>Min : {formatNullable(ranges[joint.key]?.min, "deg")}</span>
@@ -337,13 +368,7 @@ function AdvancedAnalysisPanel({ analysis, tab }: { analysis: RowingAnalysis; ta
           <article><small>Confiance</small><strong>{meta.confidence == null ? "Non disponible" : `${meta.confidence}%`}</strong></article>
         </div>
         <div className="posture-power-grid">
-          {([
-            ["Angle du genou", analysis.metrics?.kneeAngle],
-            ["Angle de la hanche", analysis.metrics?.hipAngle],
-            ["Inclinaison du dos", analysis.metrics?.backAngle],
-            ["Angle des épaules", analysis.metrics?.shoulderAngle],
-            ["Angle des coudes", analysis.metrics?.elbowAngle],
-          ] as const).map(([label, value]) => <article key={label}><small>{label}</small><strong>{formatNullable(value, "°")}</strong></article>)}
+          {postureRows.map(({ label, value }) => <article key={label}><small>{label}</small><strong>{formatNullable(value, "°")}</strong></article>)}
         </div>
         <p>{meta.note}</p>
       </section>
@@ -443,7 +468,7 @@ function Detail({ id }: { id: string }) {
     if (!analysis) return;
     setActionMessage("Préparation du fichier PDF…");
     try {
-      await downloadAnalysisPdf(analysis);
+      await downloadAnalysisPdf(analysis, profile.role);
       setActionMessage("Le rapport PDF a été téléchargé.");
     } catch {
       setActionMessage("Impossible de générer le PDF pour le moment.");
@@ -466,6 +491,23 @@ function Detail({ id }: { id: string }) {
   const subtitle = analysis
     ? `${analysis.athleteName} · ${analysis.fileName || "Vidéo"} · ${dateLabel(analysis.createdAt)}`
     : "Chargement de l’analyse…";
+  const biomechanicsNotice = restrictedBiomechanicsNotice(profile.role);
+  const visiblePostureMetrics = analysis ? [
+    { key: "knee", label: "Angle du genou", value: analysis.metrics?.kneeAngle, maximum: 180, unit: "°" },
+    { key: "hip", label: "Angle de la hanche", value: analysis.metrics?.hipAngle, maximum: 180, unit: "°" },
+    { key: "trunk", label: "Inclinaison du dos", value: analysis.metrics?.backAngle, maximum: 90, unit: "°" },
+    { key: "shoulder", label: "Angle des épaules", value: analysis.metrics?.shoulderAngle, maximum: 180, unit: "°" },
+    { key: "elbow", label: "Angle des coudes", value: analysis.metrics?.elbowAngle, maximum: 180, unit: "°" },
+    { key: "symmetry", label: "Symétrie", value: analysis.metrics?.symmetryScore, maximum: 100, unit: "%" },
+  ].filter((row) => row.key === "symmetry" || canViewJointKey(profile.role, row.key)) : [];
+  const visibleCurveMetrics = analysis ? [
+    { key: "knee", label: "Angle genou", value: analysis.metrics?.kneeAngle, unit: "°", samples: analysis.timelines?.kneeAngle ?? [], color: undefined },
+    { key: "hip", label: "Angle hanche", value: analysis.metrics?.hipAngle, unit: "°", samples: analysis.timelines?.hipAngle ?? [], color: "#a267ff" },
+    { key: "trunk", label: "Inclinaison du dos", value: analysis.metrics?.backAngle, unit: "°", samples: analysis.timelines?.backAngle ?? [], color: "#37d18b" },
+    { key: "elbow", label: "Angle des coudes", value: analysis.metrics?.elbowAngle, unit: "°", samples: analysis.timelines?.elbowAngle ?? [], color: "#f05f9e" },
+    { key: "shoulder", label: "Angle des épaules", value: analysis.metrics?.shoulderAngle, unit: "°", samples: analysis.timelines?.shoulderAngle ?? [], color: "#20bff3" },
+    { key: "symmetry", label: "Symétrie", value: analysis.metrics?.symmetryScore, unit: "%", samples: analysis.timelines?.symmetry ?? [], color: "#f3b43b" },
+  ].filter((row) => row.key === "symmetry" || canViewJointKey(profile.role, row.key)) : [];
 
   return (
     <AppShell
@@ -531,7 +573,7 @@ function Detail({ id }: { id: string }) {
             </section>
 
             {["timeline", "stroke", "race", "start", "finish", "turns", "muscle", "fatigue", "COACH"].includes(tab) && (
-              <AdvancedAnalysisPanel analysis={analysis} tab={tab} />
+              <AdvancedAnalysisPanel analysis={analysis} tab={tab} viewerRole={profile.role} />
             )}
 
             {!["comparison", "timeline", "stroke", "race", "start", "finish", "turns", "muscle", "fatigue", "COACH"].includes(tab) && (
@@ -607,26 +649,20 @@ function Detail({ id }: { id: string }) {
                   <section className="posture-detail-card">
                     <header>
                       <h2>Détails de la posture et des angles</h2>
-                      {analysis.videoStorageMode === "firebase" && [analysis.metrics?.kneeAngle, analysis.metrics?.hipAngle, analysis.metrics?.backAngle, analysis.metrics?.elbowAngle, analysis.metrics?.shoulderAngle].some((value) => value == null) && (
+                      {analysis.videoStorageMode === "firebase" && visiblePostureMetrics.some((item) => item.unit === "°" && item.value == null) && (
                         <button type="button" onClick={() => void recalculateAngles()}><RotateCcw />Recalculer les angles</button>
                       )}
                     </header>
+                    {biomechanicsNotice && <p className="biomechanics-access-note">{biomechanicsNotice}</p>}
                     <div>
-                      {([
-                        ["Angle du genou", analysis.metrics?.kneeAngle, 180],
-                        ["Angle de la hanche", analysis.metrics?.hipAngle, 180],
-                        ["Inclinaison du dos", analysis.metrics?.backAngle, 90],
-                        ["Angle des épaules", analysis.metrics?.shoulderAngle, 180],
-                        ["Angle des coudes", analysis.metrics?.elbowAngle, 180],
-                        ["Symétrie", analysis.metrics?.symmetryScore, 100],
-                      ] as const).map(([label, value, maximum]) => (
-                        <article key={label}><span><strong>{label}</strong><b>{measuredLabel(value, label === "Symétrie" ? "%" : "°")}</b></span><i><b style={{ width: `${value == null ? 0 : Math.min(100, Math.max(0, value / maximum * 100))}%` }} /></i></article>
+                      {visiblePostureMetrics.map(({ label, value, maximum, unit }) => (
+                        <article key={label}><span><strong>{label}</strong><b>{measuredLabel(value, unit)}</b></span><i><b style={{ width: `${value == null ? 0 : Math.min(100, Math.max(0, value / maximum * 100))}%` }} /></i></article>
                       ))}
                     </div>
                   </section>
                   <section className="muscle-usage-card">
                     <header><Activity /><div><h2>Groupes musculaires</h2><small>Pourcentage d’utilisation estimé pour cette analyse</small></div></header>
-                    <MovementVisualPanels environment={analysis.environment} />
+                    <MuscleVisualCards muscles={getDisplayMuscleRows(analysis)} />
                     <div>
                       {([
                         ["Dos", muscleUsageFor(analysis).back],
@@ -656,13 +692,11 @@ function Detail({ id }: { id: string }) {
                   </section>
                   <section className="analysis-curves-grid">
                     <header><div><h2>Courbes biomécaniques</h2><small>Évolution des mesures pendant la vidéo</small></div></header>
+                    {biomechanicsNotice && <p className="biomechanics-access-note">{biomechanicsNotice}</p>}
                     <div>
-                      <article><span>Angle genou <strong>{measuredLabel(analysis.metrics?.kneeAngle, "°")}</strong></span><TimelineChart samples={analysis.timelines?.kneeAngle ?? []} /></article>
-                      <article><span>Angle hanche <strong>{measuredLabel(analysis.metrics?.hipAngle, "°")}</strong></span><TimelineChart samples={analysis.timelines?.hipAngle ?? []} color="#a267ff" /></article>
-                      <article><span>Inclinaison du dos <strong>{measuredLabel(analysis.metrics?.backAngle, "°")}</strong></span><TimelineChart samples={analysis.timelines?.backAngle ?? []} color="#37d18b" /></article>
-                      <article><span>Angle des coudes <strong>{measuredLabel(analysis.metrics?.elbowAngle, "°")}</strong></span><TimelineChart samples={analysis.timelines?.elbowAngle ?? []} color="#f05f9e" /></article>
-                      <article><span>Angle des épaules <strong>{measuredLabel(analysis.metrics?.shoulderAngle, "°")}</strong></span><TimelineChart samples={analysis.timelines?.shoulderAngle ?? []} color="#20bff3" /></article>
-                      <article><span>Symétrie <strong>{measuredLabel(analysis.metrics?.symmetryScore, "%")}</strong></span><TimelineChart samples={analysis.timelines?.symmetry ?? []} color="#f3b43b" /></article>
+                      {visibleCurveMetrics.map(({ label, value, unit, samples, color }) => (
+                        <article key={label}><span>{label} <strong>{measuredLabel(value, unit)}</strong></span><TimelineChart samples={samples} color={color} /></article>
+                      ))}
                     </div>
                   </section>
                   <section className="analysis-conclusion-card">

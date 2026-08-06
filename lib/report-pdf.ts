@@ -1,6 +1,8 @@
 import { resolveAnalysisMetrics } from "@/lib/analysis/normalize-analysis";
+import { canViewJointKey, restrictedBiomechanicsNotice } from "@/lib/analysis/biomechanics-access";
 import { getDisplayJointRanges, getDisplayMuscleRows, getMuscleMeasurementMeta, jointDisplay, movementVisualPath } from "@/lib/analysis/biomechanics-display";
 import type { RowingAnalysis } from "@/types/analysis";
+import type { UserRole } from "@/types/user";
 
 type PdfDocument = import("jspdf").jsPDF;
 
@@ -32,15 +34,26 @@ function muscleRows(analysis: RowingAnalysis): Array<[string, string]> {
   return getDisplayMuscleRows(analysis).map(([label, value]) => [label, optionalValueLabel(value, "%")]);
 }
 
-function jointRangeRows(analysis: RowingAnalysis): Array<[string, string]> {
+function jointRangeRows(analysis: RowingAnalysis, viewerRole?: UserRole | null): Array<[string, string]> {
   const ranges = getDisplayJointRanges(analysis);
-  return jointDisplay.map(({ label, key }) => {
+  return jointDisplay.filter(({ key }) => canViewJointKey(viewerRole, key)).map(({ label, key }) => {
     const range = ranges[key];
     return [
       label,
       `Min ${optionalValueLabel(range?.min, "deg")} - Max ${optionalValueLabel(range?.max, "deg")} - Amplitude ${optionalValueLabel(range?.amplitude, "deg")}`,
     ];
   });
+}
+
+function postureRows(analysis: RowingAnalysis, viewerRole?: UserRole | null): Array<[string, string]> {
+  const metrics = resolveAnalysisMetrics(analysis);
+  return [
+    { key: "knee", label: "Angle du genou", value: metrics.kneeAngle },
+    { key: "hip", label: "Angle de la hanche", value: metrics.hipAngle },
+    { key: "trunk", label: "Inclinaison du dos", value: metrics.backAngle },
+    { key: "shoulder", label: "Angle des épaules", value: metrics.shoulderAngle },
+    { key: "elbow", label: "Angle des coudes", value: metrics.elbowAngle },
+  ].filter((row) => canViewJointKey(viewerRole, row.key)).map((row) => [row.label, valueLabel(row.value, "°")]);
 }
 
 async function imageDataUrl(path: string) {
@@ -153,7 +166,7 @@ function addFooters(doc: PdfDocument) {
   }
 }
 
-export async function createAnalysisPdf(analysis: RowingAnalysis) {
+export async function createAnalysisPdf(analysis: RowingAnalysis, viewerRole?: UserRole | null) {
   const { jsPDF } = await import("jspdf");
   const doc = new jsPDF({ unit: "mm", format: "a4", compress: true });
   const metrics = resolveAnalysisMetrics(analysis);
@@ -173,13 +186,9 @@ export async function createAnalysisPdf(analysis: RowingAnalysis) {
   y = sectionTitle(doc, "Biomecanique : posture, angles, muscle & power", y + 2);
   y = await movementVisual(doc, y);
   y = sectionTitle(doc, "Posture et angles", y + 2);
-  y = keyValues(doc, [
-    ["Angle du genou", valueLabel(metrics.kneeAngle, "°")],
-    ["Angle de la hanche", valueLabel(metrics.hipAngle, "°")],
-    ["Inclinaison du dos", valueLabel(metrics.backAngle, "°")],
-    ["Angle des épaules", valueLabel(metrics.shoulderAngle, "°")],
-    ["Angle des coudes", valueLabel(metrics.elbowAngle, "°")],
-  ], y);
+  const accessNotice = restrictedBiomechanicsNotice(viewerRole);
+  if (accessNotice) y = textList(doc, [accessNotice], y);
+  y = keyValues(doc, postureRows(analysis, viewerRole), y);
 
   y = sectionTitle(doc, "Muscle & Power - Exploration", y + 2);
   const muscleMeta = getMuscleMeasurementMeta(analysis);
@@ -193,7 +202,7 @@ export async function createAnalysisPdf(analysis: RowingAnalysis) {
   ], y);
 
   y = sectionTitle(doc, "Angles minimum / maximum", y + 2);
-  y = keyValues(doc, jointRangeRows(analysis), y);
+  y = keyValues(doc, jointRangeRows(analysis, viewerRole), y);
 
   y = sectionTitle(doc, "Points a surveiller", y + 2);
   y = textList(doc, analysis.errors ?? [], y);
@@ -208,8 +217,8 @@ export async function createAnalysisPdf(analysis: RowingAnalysis) {
   };
 }
 
-export async function downloadAnalysisPdf(analysis: RowingAnalysis) {
-  const { doc, filename } = await createAnalysisPdf(analysis);
+export async function downloadAnalysisPdf(analysis: RowingAnalysis, viewerRole?: UserRole | null) {
+  const { doc, filename } = await createAnalysisPdf(analysis, viewerRole);
   doc.save(filename);
   return filename;
 }
