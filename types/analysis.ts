@@ -165,7 +165,7 @@ export interface RowingAnalysis {
   cadenceTimeline?: CadenceSample[];
   timelines?: AnalysisTimelines;
   muscleUsage?: MuscleUsage;
-  crewAnalysis?: CrewAnalysisResult;
+  crewAnalysis?: CrewAnalysisResult | null;
   errors: string[]; recommendations: string[]; coachComment: string | null;
   trainingType?: AnalysisTrainingType;
   analysisType?: AnalysisDistanceType;
@@ -174,11 +174,11 @@ export interface RowingAnalysis {
   splits?: AnalysisSplit[];
   racePhases?: RacePhaseAnalysis[];
   strokes?: DetailedStroke[];
-  biomechanics?: { jointRanges?: Record<string, JointAngleRange>; powerByJointAngle?: PowerByJointAngle[]; powerCurve?: PowerCurve; forcePowerVelocity?: ForcePowerVelocityAnalysis };
+  biomechanics?: { jointRanges?: Record<string, JointAngleRange>; powerByJointAngle?: PowerByJointAngle[]; powerCurve?: PowerCurve; forcePowerVelocity?: ForcePowerVelocityAnalysis } | null;
   powerMetrics?: Record<string, MetricValue>;
-  muscleEstimation?: MuscleEstimation;
-  startAnalysis?: StartAnalysis;
-  finishAnalysis?: FinishAnalysis;
+  muscleEstimation?: MuscleEstimation | null;
+  startAnalysis?: StartAnalysis | null;
+  finishAnalysis?: FinishAnalysis | null;
   turns?: TurnAnalysis[];
   fatigue?: FatigueAnalysis;
   scores?: AnalysisScores;

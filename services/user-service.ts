@@ -3,7 +3,7 @@ import { auth, db } from "@/lib/firebase";
 import { getAthleteCategory } from "@/lib/athlete-category";
 import { createUserProfile } from "@/services/auth-service";
 import type { AthleteBestPerformance } from "@/types/athlete";
-import type { ProfileDiscipline, ProfileGender, ProfilePrivacySettings, UserProfile } from "@/types/user";
+import { normalizeUserRole, type ProfileDiscipline, type ProfileGender, type ProfilePrivacySettings, type UserProfile } from "@/types/user";
 
 export interface EditableOwnProfile {
   firstName: string;
@@ -39,11 +39,34 @@ export async function listAthletes(profile: UserProfile): Promise<UserProfile[]>
   if (!auth?.currentUser || !db) throw new Error("Session Firebase indisponible.");
   if (profile.role === "ATHLETE") return [profile];
   const users = collection(db, "users");
-  const constraints = profile.role === "SUPER_ADMIN" ? [where("role", "==", "ATHLETE")]
-    : (profile.role === "CLUB_ADMIN" || profile.role === "TECHNICAL_DIRECTOR") && profile.clubId ? [where("role", "==", "ATHLETE"), where("clubId", "==", profile.clubId)]
-    : [where("role", "==", "ATHLETE"), where("coachId", "==", profile.uid)];
-  const snapshot = await getDocs(query(users, ...constraints));
-  return snapshot.docs.map((item) => createUserProfile(item.id, typeof item.data().email === "string" ? item.data().email : null, item.data()));
+  const scopeClubIds = profile.role === "TECHNICAL_DIRECTOR" ? profile.technicalScope?.clubIds ?? [] : [];
+  const shouldLoadAll = profile.role === "SUPER_ADMIN" || (profile.role === "TECHNICAL_DIRECTOR" && !profile.clubId && scopeClubIds.length === 0);
+  const clubIds = Array.from(new Set([...(scopeClubIds ?? []), profile.clubId].filter((value): value is string => Boolean(value))));
+  const queries = profile.role === "COACH"
+    ? [query(users, where("coachId", "==", profile.uid)), query(users, where("coachIds", "array-contains", profile.uid))]
+    : shouldLoadAll
+      ? [query(users)]
+      : clubIds.map((clubId) => query(users, where("clubId", "==", clubId)));
+  if (process.env.NODE_ENV === "development") console.info("[RowMotion] ATHLETES_QUERY", { role: profile.role, queryCount: queries.length });
+  const snapshots = await Promise.all(queries.map((item) => getDocs(item)));
+  const rows = new Map<string, UserProfile>();
+  for (const snapshot of snapshots) {
+    if (!snapshot) continue;
+    snapshot.docs.forEach((item) => {
+      const data = item.data();
+      if (normalizeUserRole(data.role) !== "ATHLETE") return;
+      const athlete = createUserProfile(item.id, typeof data.email === "string" ? data.email : null, data);
+      const inScope = profile.role === "SUPER_ADMIN"
+        || (profile.role === "TECHNICAL_DIRECTOR" && (!scopeClubIds.length || Boolean(athlete.clubId && scopeClubIds.includes(athlete.clubId)) || athlete.clubId === profile.clubId))
+        || (profile.role === "CLUB_ADMIN" && Boolean(profile.clubId && athlete.clubId === profile.clubId))
+        || (profile.role === "COACH" && (athlete.coachId === profile.uid || athlete.coachIds?.includes(profile.uid)))
+        || false;
+      if (inScope) rows.set(athlete.uid, athlete);
+    });
+  }
+  const athletes = Array.from(rows.values()).sort((a, b) => `${a.lastName} ${a.firstName}`.localeCompare(`${b.lastName} ${b.firstName}`));
+  if (process.env.NODE_ENV === "development") console.info("[RowMotion] ATHLETES_LOADED", { count: athletes.length, role: profile.role });
+  return athletes;
 }
 
 export async function updateOwnProfile(uid: string, values: EditableOwnProfile) {

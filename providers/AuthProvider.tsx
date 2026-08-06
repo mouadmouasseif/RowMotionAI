@@ -9,8 +9,11 @@ import type { UserProfile } from "@/types/user";
 
 interface AuthContextValue {
   user: User | null;
+  firebaseUser: User | null;
   profile: UserProfile | null;
+  role: UserProfile["role"] | null;
   loading: boolean;
+  isAuthenticated: boolean;
   logout: () => Promise<void>;
 }
 
@@ -28,6 +31,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     let disposed=false;const timers=new Set<ReturnType<typeof setTimeout>>();
     const delay=(duration:number)=>new Promise<void>((resolve)=>{const timer=setTimeout(()=>{timers.delete(timer);resolve();},duration);timers.add(timer);});
     const unsubscribe=onAuthStateChanged(currentAuth, async (firebaseUser) => {
+      if (process.env.NODE_ENV === "development") console.info("[RowMotion] AUTH_INIT", { authenticated: Boolean(firebaseUser) });
       if(disposed)return;
       setLoading(true);
       if (!firebaseUser) { setUser(null); setProfile(null); setLoading(false); return; }
@@ -40,8 +44,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
         if (!snapshot.exists()) throw new Error("Profil absent");
         const loadedProfile = createUserProfile(firebaseUser.uid, firebaseUser.email, snapshot.data());
+        if (process.env.NODE_ENV === "development") console.info("[RowMotion] AUTH_PROFILE_LOADED", { uid: firebaseUser.uid, role: loadedProfile.role });
         if(!disposed){setUser(firebaseUser);setProfile(loadedProfile);}
-      } catch {
+      } catch (error) {
+        if (process.env.NODE_ENV === "development") console.error("[RowMotion] AUTH_PROFILE_ERROR", { error });
         await signOut(currentAuth);
         if(!disposed){setUser(null);setProfile(null);}
       } finally { if(!disposed)setLoading(false); }
@@ -50,7 +56,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const value = useMemo<AuthContextValue>(() => ({
-    user, profile, loading,
+    user, firebaseUser: user, profile, role: profile?.role ?? null, loading, isAuthenticated: Boolean(user && profile),
     logout: async () => { if (auth) await signOut(auth); },
   }), [user, profile, loading]);
 

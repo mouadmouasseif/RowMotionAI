@@ -1,6 +1,7 @@
 import { addDoc, collection, deleteDoc, doc, getDoc, getDocs, limit, onSnapshot, orderBy, query, serverTimestamp, updateDoc, where } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
 import { normalizeAnalysis } from "@/lib/analysis/normalize-analysis";
+import { sanitizeFirestoreData } from "@/lib/firestore-sanitize";
 import { emptyAnalysisMetrics, initialAnalysisProgress, type AnalysisDistanceType, type AnalysisEnvironment, type AnalysisScope, type AnalysisSource, type AnalysisTrainingType, type RowingAnalysis } from "@/types/analysis";
 import type { UserProfile } from "@/types/user";
 
@@ -40,7 +41,7 @@ export async function getAnalysis(id: string, profile: UserProfile): Promise<Row
 
 export async function createAnalysis(input: { athleteId: string; athleteName: string; environment: AnalysisEnvironment; sourceType: AnalysisSource; trainingType?: AnalysisTrainingType; analysisScope?: AnalysisScope; analysisType?: AnalysisDistanceType; distance?: number | null; profile: UserProfile; fileName?: string }) {
   const { database, user } = requireFirebase();
-  const reference = await addDoc(collection(database, "analyses"), {
+  const payload = sanitizeFirestoreData({
     athleteId: input.athleteId, athleteName: input.athleteName,
     coachId: input.profile.role === "COACH" ? input.profile.uid : input.profile.coachId,
     clubId: input.profile.clubId, createdBy: user.uid, sourceType: input.sourceType,
@@ -49,8 +50,11 @@ export async function createAnalysis(input: { athleteId: string; athleteName: st
     videoUrl: null, storagePath: null, videoStorageMode: "none", thumbnailUrl: null, fileName: input.fileName ?? null,
     durationSeconds: null, technicalScore: null, metrics: emptyAnalysisMetrics,
     phases: {}, splits: [], racePhases: [], strokes: [], turns: [], errors: [], recommendations: [], coachComment: null,
+    crewAnalysis: null, startAnalysis: null, finishAnalysis: null, biomechanics: null, muscleEstimation: null,
     createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
   });
+  if (process.env.NODE_ENV === "development") console.info("[RowMotion] ANALYSIS_SAVE", { athleteId: input.athleteId, environment: input.environment, sourceType: input.sourceType });
+  const reference = await addDoc(collection(database, "analyses"), payload);
   return reference.id;
 }
 
@@ -77,7 +81,14 @@ export const retryAnalysis = (id: string) => authenticatedRequest(`/api/analyses
 export async function updateAnalysis(id: string, values: Partial<RowingAnalysis>) {
   const { database } = requireFirebase();
   const safeValues = { ...values }; delete safeValues.id;
-  await updateDoc(doc(database, "analyses", id), { ...safeValues, updatedAt: serverTimestamp() });
+  const payload = sanitizeFirestoreData({ ...safeValues, updatedAt: serverTimestamp() });
+  try {
+    if (process.env.NODE_ENV === "development") console.info("[RowMotion] ANALYSIS_SAVE", { id, fields: Object.keys(payload) });
+    await updateDoc(doc(database, "analyses", id), payload);
+  } catch (error) {
+    if (process.env.NODE_ENV === "development") console.error("[RowMotion] ANALYSIS_SAVE_ERROR", { id, error });
+    throw error;
+  }
 }
 
 export async function removeAnalysis(id: string, profile: UserProfile) {

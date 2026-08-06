@@ -166,7 +166,7 @@ function Content() {
         muscleUsage: result.muscleUsage,
         biomechanics: { jointRanges: buildJointRanges(result.timelines) },
         muscleEstimation: buildMuscleEstimation(result.muscleUsage),
-        crewAnalysis: result.crewAnalysis,
+        crewAnalysis: environment === "double_scull" ? result.crewAnalysis ?? null : null,
         metricsSource: "biomechanics_engine",
         progress: {
           status: "completed",

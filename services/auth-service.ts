@@ -54,6 +54,7 @@ export function createUserProfile(uid: string, authEmail: string | null, data: R
     onboardingCompleted: data.onboardingCompleted === true,
     clubId: typeof data.clubId === "string" ? data.clubId : null,
     coachId: typeof data.coachId === "string" ? data.coachId : null,
+    coachIds: Array.isArray(data.coachIds) ? data.coachIds.filter((value): value is string => typeof value === "string") : [],
     technicalScope: technicalScopeFrom(data),
     licenseNumber: typeof data.licenseNumber === "string" ? data.licenseNumber : null,
     phone: typeof data.phone === "string" ? data.phone : null,

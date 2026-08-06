@@ -64,7 +64,7 @@ export function AppShell({
   };
 
   return (
-    <main className={`dashboard-page${useReferenceLayout ? " dashboard-reference" : ""}`}>
+    <main className={`dashboard-page${useReferenceLayout ? " dashboard-reference" : ""}${profile.role === "ATHLETE" ? " athlete-dashboard-shell" : ""}`}>
       {mobileOpen && <button className="mobile-overlay" aria-label="Fermer le menu" onClick={() => setMobileOpen(false)} />}
       <aside className={`sidebar ${mobileOpen ? "mobile-open" : ""}`}>
         <Brand compact />

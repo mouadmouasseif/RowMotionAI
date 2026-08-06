@@ -7,7 +7,19 @@ export type UserRole =
   | "ATHLETE"
   | "JURY";
 export type FutureUserRole = "FEDERATION_ADMIN" | "MEDICAL_STAFF" | "PHYSICAL_TRAINER";
-export type LegacyUserRole = "athlete" | "coach" | "club_admin" | "superadmin";
+export type LegacyUserRole =
+  | "athlete"
+  | "coach"
+  | "club_admin"
+  | "clubadmin"
+  | "club-admin"
+  | "super_admin"
+  | "superadmin"
+  | "super-admin"
+  | "technical_director"
+  | "technical-director"
+  | "directeur_technique"
+  | "jury";
 export type ProfileDiscipline = "ERGOMETER" | "SKIFF" | "BEACH_ROWING";
 export type ProfileCategory = "U15" | "U19" | "U21" | "U23" | "SENIOR";
 export type ProfileGender = "male" | "female" | "other" | "not_specified";
@@ -29,6 +41,7 @@ export interface UserProfile {
   active: boolean;
   clubId: string | null;
   coachId: string | null;
+  coachIds?: string[];
   licenseNumber: string | null;
   phone: string | null;
   profilePhotoUrl: string | null;
@@ -67,7 +80,15 @@ const legacyRoleMap: Record<LegacyUserRole, UserRole> = {
   athlete: "ATHLETE",
   coach: "COACH",
   club_admin: "CLUB_ADMIN",
+  clubadmin: "CLUB_ADMIN",
+  "club-admin": "CLUB_ADMIN",
+  super_admin: "SUPER_ADMIN",
   superadmin: "SUPER_ADMIN",
+  "super-admin": "SUPER_ADMIN",
+  technical_director: "TECHNICAL_DIRECTOR",
+  "technical-director": "TECHNICAL_DIRECTOR",
+  directeur_technique: "TECHNICAL_DIRECTOR",
+  jury: "JURY",
 };
 
 export function isUserRole(value: unknown): value is UserRole {
@@ -76,7 +97,9 @@ export function isUserRole(value: unknown): value is UserRole {
 
 export function normalizeUserRole(value: unknown): UserRole | null {
   if (isUserRole(value)) return value;
-  if (typeof value === "string" && value in legacyRoleMap) return legacyRoleMap[value as LegacyUserRole];
+  if (typeof value !== "string") return null;
+  const normalized = value.trim().toLowerCase().replace(/\s+/g, "_");
+  if (normalized in legacyRoleMap) return legacyRoleMap[normalized as LegacyUserRole];
   return null;
 }
 
