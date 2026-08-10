@@ -4,7 +4,7 @@ import { auth, storage } from "@/lib/firebase";
 const allowedTypes = new Set(["video/mp4", "video/quicktime", "video/webm", "video/x-msvideo", "video/mov", "video/x-m4v"]);
 const allowedExtensions = [".mp4", ".mov", ".m4v", ".webm", ".avi"];
 
-export const MAX_VIDEO_SIZE_MB = Number(process.env.NEXT_PUBLIC_MAX_VIDEO_SIZE_MB ?? 500);
+export const MAX_VIDEO_SIZE_MB = Number(process.env.NEXT_PUBLIC_MAX_VIDEO_SIZE_MB ?? 5120);
 export const MAX_VIDEO_SIZE = MAX_VIDEO_SIZE_MB * 1024 * 1024;
 export const isCloudVideoStorageEnabled = process.env.NEXT_PUBLIC_VIDEO_STORAGE_MODE === "firebase";
 

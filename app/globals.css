@@ -284,7 +284,71 @@ h1 span { color:#3485ff; }
 .public-nav-auth{display:none}
 .athlete-filter-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px;margin:0 0 12px}
 .athlete-filter-grid select{min-width:0;height:39px;border:1px solid #203a56;border-radius:8px;padding:0 10px;color:#eaf2ff;background:#071726}
-@media(max-width:1350px){.public-header nav.open .public-nav-auth{display:block;color:#eef7ff}}
+@media(max-width:1350px){
+  .public-header{position:sticky;isolation:isolate}
+  .public-header nav.open{
+    position:absolute;
+    top:calc(100% + 10px);
+    right:clamp(16px,2.5vw,44px);
+    left:auto;
+    bottom:auto;
+    width:min(390px,calc(100vw - 32px));
+    max-height:calc(100dvh - 104px);
+    display:grid;
+    grid-template-columns:1fr;
+    gap:6px;
+    align-items:stretch;
+    justify-content:start;
+    padding:12px;
+    border:1px solid #1d4569;
+    border-radius:14px;
+    background:#061421;
+    box-shadow:0 24px 70px rgba(0,0,0,.52);
+    overflow:auto;
+  }
+  .public-header nav.open a{
+    min-height:42px;
+    display:flex;
+    align-items:center;
+    padding:0 12px;
+    border:1px solid transparent;
+    border-radius:9px;
+    color:#cfe0f2;
+    background:transparent;
+    font-size:14px;
+  }
+  .public-header nav.open a:hover{border-color:#214667;background:#0b2034;color:#fff}
+  .public-header nav.open .public-nav-auth{
+    display:flex;
+    justify-content:center;
+    margin-top:6px;
+    border-color:#2c5d8b;
+    color:#eef7ff;
+    background:#0b2238;
+    font-weight:750;
+  }
+  .public-header nav.open .public-nav-auth:last-child{
+    border-color:#2879f4;
+    background:#2879f4;
+  }
+  .public-actions .button.ghost{display:inline-flex}
+  .public-actions .button.primary{display:none}
+}
+@media(max-width:720px){
+  .public-header{min-height:68px}
+  .public-header .brand{flex:1 1 auto;min-width:135px;width:auto}
+  .public-header .brand-logo{width:170px;max-width:100%}
+  .public-actions{gap:7px}
+  .public-actions .search-link{display:none}
+  .public-actions .button.ghost{min-height:34px;padding:0 10px;font-size:12px}
+  .public-menu-button{width:36px;height:36px;display:grid;place-items:center;border:1px solid #24435f;border-radius:8px;background:#071420}
+  .public-header nav.open{top:calc(100% + 8px);right:12px;width:calc(100vw - 24px);max-height:calc(100dvh - 88px)}
+}
+@media(max-width:380px){
+  .public-header{padding-left:12px;padding-right:12px}
+  .public-header .brand-logo{width:145px}
+  .public-actions .button.ghost{padding:0 8px}
+}
 @media(max-width:900px){.athlete-filter-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:620px){.athlete-filter-grid{grid-template-columns:1fr}}
 
@@ -686,3 +750,26 @@ h1 span { color:#3485ff; }
   .admin-form-grid>label.wide,.admin-form-grid>fieldset.wide{grid-column:auto}
   .admin-dialog form>footer{position:sticky;bottom:0;margin:18px -22px -22px;padding:14px 22px;background:#071522}
 }
+
+.status-pill.preparing,.status-pill.analyzing,.status-pill.generating_results,.status-pill.queued{color:#6eacff;background:#102c50}
+.video-preview{min-width:0}
+.video-preview video{aspect-ratio:16/9;object-fit:contain}
+.analysis-key-metrics strong{min-width:0;white-space:normal;overflow-wrap:anywhere}
+.analysis-session,.analysis-date{min-width:0}
+.analysis-session strong,.analysis-session small,.analysis-session p{overflow-wrap:anywhere}
+.biomechanical-video-wrap{display:grid;place-items:center;aspect-ratio:16/9;background:#02070d}
+.biomechanical-video-wrap video{width:100%;height:100%;max-height:70vh;object-fit:contain;background:#02070d}
+.analysis-ref-video-frame{display:grid;place-items:center;background:#02070d}
+.analysis-ref-video-frame video{object-fit:contain}
+.analysis-ref-player-controls{min-width:0}
+.analysis-ref-player-controls button,.analysis-ref-player-controls select{flex:0 0 auto}
+.analysis-ref-player-controls strong{overflow-wrap:anywhere}
+@media(max-width:700px){.video-preview video{max-height:65vh}.analysis-ref-player-controls button{width:36px}.analysis-key-metrics{grid-template-columns:1fr}.analysis-key-metrics small{white-space:normal}.progress-main-chart>div{gap:8px;overflow-x:auto}.records-card>div{grid-template-columns:1fr 1fr}}
+@media(max-width:430px){.analysis-ref-video-frame{aspect-ratio:9/16;max-height:70vh}.records-card>div{grid-template-columns:1fr}}
+.phase-illustration img,.full-phase-timeline img{width:100%;height:auto;max-height:96px;object-fit:contain;filter:drop-shadow(0 0 10px color-mix(in srgb,var(--phase) 35%,transparent));opacity:.9}
+.phase-illustration.active img,.full-phase-timeline button.active img{opacity:1;transform:scale(1.04)}
+.cycle-phase-strip .phase-illustration{min-height:132px;background:radial-gradient(circle at 50% 45%,color-mix(in srgb,var(--phase) 12%,transparent),#071827 68%)}
+.full-phase-timeline button{background:radial-gradient(circle at 50% 42%,color-mix(in srgb,var(--phase) 10%,transparent),#071a2a 70%)}
+.biomech-chart-card path,.small-line-chart path,.mini-chart-grid path{stroke-linecap:round;stroke-linejoin:round}
+.muscle-cards-panel article>span{box-shadow:0 0 20px rgba(21,151,255,.18)}
+.muscle-distribution i{overflow:hidden}

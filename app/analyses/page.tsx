@@ -29,48 +29,39 @@ import type { RowingAnalysis } from "@/types/analysis";
 type AnalysisTab = "all" | RowingAnalysis["environment"] | "video" | "favorites";
 
 const environmentMeta: Record<RowingAnalysis["environment"], { label: string; description: string; water: boolean }> = {
-  ergometer: { label: "Ergomètre", description: "Travail d’endurance + technique", water: false },
-  boat: { label: "Sur l’eau", description: "Travail technique + départs", water: true },
+  ergometer: { label: "Ergometre", description: "Travail d'endurance + technique", water: false },
+  boat: { label: "Sur l'eau", description: "Travail technique + departs", water: true },
   double_scull: { label: "Bateau double", description: "Technique individuelle + synchronisation", water: true },
-  beach_sprint: { label: "Aviron Beach", description: "Départ, embarquement, sprint et retour plage", water: true },
+  beach_sprint: { label: "Aviron Beach", description: "Depart, embarquement, sprint et retour plage", water: true },
 };
-
-function dateDaysAgo(days: number) {
-  const date = new Date();
-  date.setDate(date.getDate() - days);
-  return date.toLocaleDateString("fr-FR", {
-    day: "2-digit",
-    month: "long",
-    year: "numeric",
-  });
-}
 
 function formatAnalysisDate(value: unknown) {
   const date = toDate(value);
   return date
-    ? date.toLocaleDateString("fr-FR", {
-        day: "2-digit",
-        month: "long",
-        year: "numeric",
-      })
-    : dateDaysAgo(0);
+    ? date.toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric" })
+    : "Date non disponible";
 }
 
-const fallbackRows = [
-  { title: `Séance du ${dateDaysAgo(0)}`, environment: "ergometer" as const, duration: "20:45", distance: "6,310 m", pace: "2:18.4", cadence: 28, power: 268, score: 8.7, date: dateDaysAgo(0), ago: "Aujourd’hui" },
-  { title: "Sortie Lac - Technique", environment: "boat" as const, duration: "32:15", distance: "8,250 m", pace: "2:05", cadence: 24, power: 256, score: 8.3, date: dateDaysAgo(1), ago: "Hier" },
-  { title: "Intervalles 6x500m", environment: "ergometer" as const, duration: "18:30", distance: "5,000 m", pace: "1:52.6", cadence: 30, power: 312, score: 9.2, date: dateDaysAgo(2), ago: "Il y a 2 jours" },
-  { title: "Sortie Longue Distance", environment: "boat" as const, duration: "28:10", distance: "10,230 m", pace: "2:16.8", cadence: 26, power: 220, score: 7.8, date: dateDaysAgo(3), ago: "Il y a 3 jours" },
-  { title: "Technique & Posture", environment: "ergometer" as const, duration: "22:10", distance: "6,000 m", pace: "2:24.1", cadence: 27, power: 198, score: 7.1, date: dateDaysAgo(5), ago: "Il y a 5 jours" },
-  { title: "Travail de départs", environment: "boat" as const, duration: "35:40", distance: "7,500 m", pace: "2:01.5", cadence: 25, power: 278, score: 8.8, date: dateDaysAgo(7), ago: "Il y a 1 semaine" },
-  { title: "Test 2K", environment: "ergometer" as const, duration: "15:02", distance: "2,000 m", pace: "1:45.3", cadence: 32, power: 340, score: 9.4, date: dateDaysAgo(8), ago: "Il y a 1 semaine" },
-];
+function formatDuration(seconds: number | null | undefined) {
+  if (!seconds) return "Non disponible";
+  return `${Math.floor(seconds / 60)}:${String(Math.round(seconds % 60)).padStart(2, "0")}`;
+}
 
-function scoreLabel(score: number) {
+function average(values: Array<number | null | undefined>) {
+  const available = values.filter((value): value is number => typeof value === "number" && Number.isFinite(value));
+  return available.length ? available.reduce((sum, value) => sum + value, 0) / available.length : null;
+}
+
+function scoreLabel(score: number | null) {
+  if (score == null) return "Non disponible";
   if (score >= 8.5) return "Excellent";
-  if (score >= 8) return "Très bien";
+  if (score >= 8) return "Tres bien";
   if (score >= 7.5) return "Bien";
   return "Correct";
+}
+
+function formatScore(value: number | null) {
+  return value == null ? "—" : value.toFixed(1);
 }
 
 function AnalysesContent() {
@@ -91,26 +82,24 @@ function AnalysesContent() {
       .finally(() => setLoading(false));
   }, [profile]);
 
-  const rows = useMemo(() => {
-    const realRows = items.map((item, index) => ({
-      id: item.id,
-      title: item.fileName || item.athleteName || `Analyse ${index + 1}`,
-      environment: item.environment,
-      duration: item.durationSeconds
-        ? `${Math.floor(item.durationSeconds / 60)}:${String(Math.round(item.durationSeconds % 60)).padStart(2, "0")}`
-        : "20:45",
-      distance: item.metrics?.strokeLength ? `${item.metrics.strokeLength.toFixed(2)} m/coup` : "6,310 m",
-      pace: "2:18.4",
-      cadence: item.metrics?.strokeRate ?? 28,
-      power: item.metrics?.estimatedPower ?? 268,
-      score: item.technicalScore ? item.technicalScore / 10 : 8.2,
-      date: formatAnalysisDate(item.createdAt),
-      ago: item.status === "completed" ? "Terminée" : item.status,
-      item,
-    }));
-    if (realRows.length) return realRows;
-    return fallbackRows.map((row, index) => ({ ...row, id: `demo-${index}`, item: null }));
-  }, [items]);
+  const rows = useMemo(
+    () =>
+      items.map((item, index) => ({
+        id: item.id,
+        title: item.fileName || item.athleteName || `Analyse ${index + 1}`,
+        environment: item.environment,
+        duration: formatDuration(item.durationSeconds),
+        distance: item.distance ? `${item.distance} m` : item.metrics?.strokeLength ? `${item.metrics.strokeLength.toFixed(2)} m/coup` : "Non disponible",
+        pace: "Non disponible",
+        cadence: item.metrics?.strokeRate ?? null,
+        power: item.metrics?.estimatedPower ?? null,
+        score: item.technicalScore == null ? null : item.technicalScore / 10,
+        date: formatAnalysisDate(item.createdAt),
+        ago: item.status === "completed" ? "Terminee" : item.status,
+        item,
+      })),
+    [items],
+  );
 
   const filtered = rows.filter((row) => {
     const matchesSearch = row.title.toLowerCase().includes(search.toLowerCase());
@@ -124,6 +113,10 @@ function AnalysesContent() {
       (tab === "favorites" && favorites.has(row.id));
     return matchesSearch && matchesTab;
   });
+
+  const totalDuration = items.reduce((sum, item) => sum + (item.durationSeconds ?? 0), 0);
+  const averageScore = average(items.map((item) => item.technicalScore));
+  const averagePower = average(items.map((item) => item.metrics?.estimatedPower));
 
   if (!profile) return null;
 
@@ -140,12 +133,12 @@ function AnalysesContent() {
     <AppShell
       referenceMode
       title="Analyses"
-      subtitle="Consultez toutes vos analyses vidéo et suivez vos performances dans le temps."
+      subtitle="Consultez toutes vos analyses video et suivez vos performances dans le temps."
       headerActions={
         <>
-          <Link className="button primary" href="/analyses/nouvelle"><Upload />Importer une vidéo</Link>
+          <Link className="button primary" href="/analyses/nouvelle"><Upload />Importer une video</Link>
           <Link className="button ghost" href="/analyses/live"><Radio />Analyse en direct</Link>
-          <button className="reference-more" aria-label="Plus d’options"><MoreHorizontal /></button>
+          <button className="reference-more" aria-label="Plus d'options"><MoreHorizontal /></button>
         </>
       }
     >
@@ -153,13 +146,13 @@ function AnalysesContent() {
         <div className="analysis-toolbar">
           <div className="analysis-tabs">
             {[
-              ["all", "Toutes", rows.length || 42],
-              ["ergometer", "Ergomètre", rows.filter((row) => row.environment === "ergometer").length || 28],
-              ["boat", "Sur l’eau", rows.filter((row) => row.environment === "boat").length || 14],
+              ["all", "Toutes", rows.length],
+              ["ergometer", "Ergometre", rows.filter((row) => row.environment === "ergometer").length],
+              ["boat", "Sur l'eau", rows.filter((row) => row.environment === "boat").length],
               ["double_scull", "Bateau double", rows.filter((row) => row.environment === "double_scull").length],
               ["beach_sprint", "Aviron Beach", rows.filter((row) => row.environment === "beach_sprint").length],
-              ["video", "Vidéos importées", items.length || 24],
-              ["favorites", "Favoris", favorites.size || 8],
+              ["video", "Videos importees", items.length],
+              ["favorites", "Favoris", favorites.size],
             ].map(([value, label, count]) => (
               <button key={value} className={tab === value ? "active" : ""} onClick={() => setTab(value as AnalysisTab)}>
                 {label}<span>{count}</span>
@@ -168,34 +161,41 @@ function AnalysesContent() {
           </div>
           <label className="analysis-search"><Search /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Rechercher une analyse..." /></label>
           <button className="analysis-filter"><Filter />Filtres</button>
-          <select aria-label="Trier les analyses"><option>Plus récent</option><option>Meilleur score</option><option>Plus ancien</option></select>
+          <select aria-label="Trier les analyses"><option>Plus recent</option><option>Meilleur score</option><option>Plus ancien</option></select>
         </div>
 
-        {loading ? <div className="loading-card">Chargement des analyses…</div> : error ? <div className="error-card">{error}</div> : (
+        {loading ? <div className="loading-card">Chargement des analyses...</div> : error ? <div className="error-card">{error}</div> : (
           <div className="analyses-layout">
             <section className="analysis-table">
-              <header><span>Aperçu</span><span>Séance</span><span>Type</span><span>Métriques clés</span><span>Score</span><span>Date</span><span>Actions</span></header>
+              <header><span>Apercu</span><span>Seance</span><span>Type</span><span>Metriques cles</span><span>Score</span><span>Date</span><span>Actions</span></header>
               {filtered.length === 0 ? (
-                <div className="empty-state"><FileVideo /><h2>Aucune analyse trouvée</h2><p>Ajustez la recherche ou les filtres.</p></div>
-              ) : filtered.slice(0, 7).map((row, rowIndex) => (
+                <div className="empty-state"><FileVideo /><h2>Aucune analyse trouvee</h2><p>Importez une video ou ajustez la recherche.</p></div>
+              ) : filtered.slice(0, 7).map((row) => (
                 <article key={row.id}>
-                  <button className={`favorite-button ${favorites.has(row.id) || rowIndex === 0 || rowIndex === 3 ? "selected" : ""}`} onClick={() => toggleFavorite(row.id)} aria-label="Ajouter aux favoris"><Star /></button>
+                  <button className={`favorite-button ${favorites.has(row.id) ? "selected" : ""}`} onClick={() => toggleFavorite(row.id)} aria-label="Ajouter aux favoris"><Star /></button>
                   <div className={`analysis-preview ${row.environment}`}>
-                    {row.item?.thumbnailUrl ? (
+                    {row.item.thumbnailUrl ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img src={row.item.thumbnailUrl} alt="" />
-                    ) : environmentMeta[row.environment].water ? <Waves /> : <FileVideo />}
-                    <time>▶{rowIndex % 2 ? "00:32" : "00:20"}</time>
+                    ) : (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src="/rowing-phases/neon-catch.png" alt="" />
+                    )}
+                    <time>{row.duration}</time>
                   </div>
-                  <div className="analysis-session"><strong>{row.title}</strong><small><Clock3 />{environmentMeta[row.environment].label} · {row.duration} · {row.distance}</small><p>{environmentMeta[row.environment].description}</p></div>
+                  <div className="analysis-session"><strong>{row.title}</strong><small><Clock3 />{environmentMeta[row.environment].label} - {row.duration} - {row.distance}</small><p>{environmentMeta[row.environment].description}</p></div>
                   <span className={`environment-pill ${row.environment}`}>{environmentMeta[row.environment].water ? <Waves /> : <FileVideo />}{environmentMeta[row.environment].label}</span>
-                  <div className="analysis-key-metrics"><span><Timer /><strong>{row.pace}<i>/500m</i></strong><small>Allure moyenne</small></span><span><Gauge /><strong>{row.cadence}<i>spm</i></strong><small>Cadence moyenne</small></span><span><TrendingIcon /><strong>{row.power}<i>w</i></strong><small>Puissance moyenne</small></span></div>
-                  <div className={`table-score ${row.score < 8 ? "medium" : ""}`}><strong>{row.score.toFixed(1)}<i>/10</i></strong><small>{scoreLabel(row.score)}</small></div>
+                  <div className="analysis-key-metrics">
+                    <span><Timer /><strong>{row.pace}</strong><small>Allure moyenne</small></span>
+                    <span><Gauge /><strong>{row.cadence == null ? "Non disponible" : row.cadence.toFixed(1)}<i>{row.cadence == null ? "" : "spm"}</i></strong><small>Cadence moyenne</small></span>
+                    <span><TrendingIcon /><strong>{row.power == null ? "Non disponible" : row.power.toFixed(0)}<i>{row.power == null ? "" : "w"}</i></strong><small>Puissance moyenne</small></span>
+                  </div>
+                  <div className={`table-score ${row.score != null && row.score < 8 ? "medium" : ""}`}><strong>{formatScore(row.score)}<i>{row.score == null ? "" : "/10"}</i></strong><small>{scoreLabel(row.score)}</small></div>
                   <div className="analysis-date"><strong>{row.date}</strong><small>{row.ago}</small></div>
                   <div className="analysis-actions">
-                    <Link href={row.item ? `/analyses/${row.id}` : "/analyses/nouvelle"} aria-label="Voir"><Eye /></Link>
-                    <Link href={row.item ? `/analyses/${row.id}` : "/progression"} aria-label="Graphiques"><BarChart3 /></Link>
-                    {row.item && (profile.role === "SUPER_ADMIN" || profile.uid === row.item.createdBy) ? (
+                    <Link href={`/analyses/${row.id}`} aria-label="Voir"><Eye /></Link>
+                    <Link href={`/analyses/${row.id}`} aria-label="Graphiques"><BarChart3 /></Link>
+                    {(profile.role === "SUPER_ADMIN" || profile.uid === row.item.createdBy) ? (
                       <button aria-label="Supprimer" onClick={async () => {
                         if (!confirm("Supprimer cette analyse ?")) return;
                         try {
@@ -209,13 +209,20 @@ function AnalysesContent() {
                   </div>
                 </article>
               ))}
-              <footer><span>Affichage 1 à {Math.min(filtered.length, 7)} sur {rows.length || 42} analyses</span><nav><button>‹</button><button className="active">1</button><button>2</button><button>3</button><i>…</i><button>6</button><button>›</button></nav><label>Afficher <select><option>7 par page</option></select></label></footer>
+              <footer><span>Affichage 1 a {Math.min(filtered.length, 7)} sur {rows.length} analyses</span><nav><button disabled>‹</button><button className="active">1</button><button disabled>›</button></nav><label>Afficher <select><option>7 par page</option></select></label></footer>
             </section>
 
             <aside className="analysis-sidebar">
-              <section><h2>Résumé</h2><div><FileVideo /><span><strong>{rows.length || 42}</strong><small>Analyses</small></span></div><div><Clock3 /><span><strong>28h 45m</strong><small>Temps total analysé</small></span></div><div><Waves /><span><strong>186,310 m</strong><small>Distance totale</small></span></div><div><Gauge /><span><small>Score moyen</small><strong className="green-score">8.2<small>/10</small></strong></span></div></section>
-              <section className="quick-filters"><div className="aside-title"><h2>Filtres rapides</h2><button>Réinitialiser</button></div><label>Période<select><option>Tout le temps</option></select></label><label>Type d’analyse<select><option>Tous les types</option></select></label><label>Score minimum<div className="score-filter">{[1,2,3,4,5].map((value) => <button key={value}><Star /></button>)}</div></label><label>Séance<select><option>Toutes les séances</option></select></label><button className="button primary">Appliquer les filtres</button></section>
-              <section className="export-card"><h2>Exportation</h2><p>Exportez vos données d’analyses pour un suivi personnalisé.</p><button><Download />Exporter CSV</button></section>
+              <section>
+                <h2>Resume</h2>
+                <div><FileVideo /><span><strong>{rows.length}</strong><small>Analyses</small></span></div>
+                <div><Clock3 /><span><strong>{totalDuration ? formatDuration(totalDuration) : "Non disponible"}</strong><small>Temps total analyse</small></span></div>
+                <div><Waves /><span><strong>Non disponible</strong><small>Distance totale</small></span></div>
+                <div><Gauge /><span><small>Score moyen</small><strong className="green-score">{averageScore == null ? "Non disponible" : (averageScore / 10).toFixed(1)}<small>{averageScore == null ? "" : "/10"}</small></strong></span></div>
+                <div><TrendingIcon /><span><small>Puissance moyenne</small><strong>{averagePower == null ? "Non disponible" : `${averagePower.toFixed(0)} w`}</strong></span></div>
+              </section>
+              <section className="quick-filters"><div className="aside-title"><h2>Filtres rapides</h2><button>Reinitialiser</button></div><label>Periode<select><option>Tout le temps</option></select></label><label>Type d&apos;analyse<select><option>Tous les types</option></select></label><label>Score minimum<div className="score-filter">{[1,2,3,4,5].map((value) => <button key={value}><Star /></button>)}</div></label><label>Seance<select><option>Toutes les seances</option></select></label><button className="button primary">Appliquer les filtres</button></section>
+              <section className="export-card"><h2>Exportation</h2><p>Exportez vos donnees d&apos;analyses pour un suivi personnalise.</p><button><Download />Exporter CSV</button></section>
             </aside>
           </div>
         )}
@@ -231,4 +238,3 @@ function TrendingIcon() {
 export default function AnalysesPage() {
   return <ProtectedPage><AnalysesContent /></ProtectedPage>;
 }
-

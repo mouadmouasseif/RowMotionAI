@@ -7,11 +7,11 @@ import { AppShell } from "@/components/AppShell";
 import { ProtectedPage } from "@/components/ProtectedPage";
 import { AthleteSelector } from "@/components/AthleteSelector";
 import { useAuth } from "@/providers/AuthProvider";
-import { createAnalysis, updateAnalysis } from "@/services/analysis-service";
+import { createAnalysis, queueAnalysis, updateAnalysis } from "@/services/analysis-service";
 import { saveLocalAnalysisVideo } from "@/services/local-video-service";
 import { analyzeLocalVideo } from "@/services/local-pose-analysis-service";
-import { inspectAnalysisVideo, MAX_VIDEO_SIZE_MB } from "@/services/storage-service";
-import type { AnalysisDistanceType, AnalysisEnvironment, AnalysisScope, AnalysisTimelines, JointAngleRange, MetricSample, MuscleUsage } from "@/types/analysis";
+import { inspectAnalysisVideo, isCloudVideoStorageEnabled, MAX_VIDEO_SIZE_MB, uploadAnalysisVideo } from "@/services/storage-service";
+import type { AnalysisDistanceType, AnalysisEnvironment, AnalysisScope, AnalysisStep, AnalysisTimelines, JointAngleRange, MetricSample, MuscleUsage } from "@/types/analysis";
 import type { UserProfile } from "@/types/user";
 
 const analysisTypeOptions: { value: AnalysisDistanceType; label: string; meters?: number }[] = [
@@ -29,6 +29,22 @@ const analysisTypeOptions: { value: AnalysisDistanceType; label: string; meters?
   { value: "training", label: "Entrainement" },
   { value: "competition", label: "Competition" },
 ];
+
+const stepLabels: Record<AnalysisStep, string> = {
+  validation: "Validation du fichier",
+  upload: "Sauvegarde video",
+  video_preparation: "Preparation video",
+  video_preprocessing: "Optimisation pour analyse",
+  athlete_detection: "Detection athlete",
+  pose_detection: "Estimation de pose",
+  stroke_detection: "Detection des coups",
+  biomechanics: "Biomecanique",
+  metrics_calculation: "Calcul des metriques",
+  recommendations: "Recommandations",
+  report_generation: "Generation du rapport",
+  saving_results: "Enregistrement",
+  completed: "Termine",
+};
 
 function buildRange(samples: MetricSample[]): JointAngleRange {
   const values = samples.map((sample) => sample.value).filter((value) => Number.isFinite(value));
@@ -81,6 +97,7 @@ function Content() {
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState("");
   const [progress, setProgress] = useState(0);
+  const [currentStep, setCurrentStep] = useState<AnalysisStep>("validation");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -135,24 +152,45 @@ function Content() {
       });
       createdAnalysisId = id;
 
-      const localPath = await saveLocalAnalysisVideo(id, file, setProgress);
+      setCurrentStep("upload");
+      const storedVideo = isCloudVideoStorageEnabled
+        ? await uploadAnalysisVideo(id, file, setProgress)
+        : { path: await saveLocalAnalysisVideo(id, file, setProgress), url: null };
       await updateAnalysis(id, {
-        videoUrl: null,
-        storagePath: localPath,
-        videoStorageMode: "local",
+        videoUrl: storedVideo.url,
+        storagePath: storedVideo.path,
+        videoStorageMode: isCloudVideoStorageEnabled ? "firebase" : "local",
         durationSeconds: metadata.duration,
-        status: "processing",
+        status: "preparing",
         progress: {
-          status: "processing",
+          status: "preparing",
+          progress: 100,
+          currentStep: "video_preparation",
+          processedFrames: 0,
+          totalFrames: 0,
+        },
+      });
+
+      if (isCloudVideoStorageEnabled) {
+        await queueAnalysis(id);
+        router.replace(`/analyses/${id}`);
+        return;
+      }
+
+      setProgress(0);
+      setCurrentStep("pose_detection");
+      await updateAnalysis(id, {
+        status: "analyzing",
+        progress: {
+          status: "analyzing",
           progress: 0,
           currentStep: "pose_detection",
           processedFrames: 0,
           totalFrames: 0,
         },
       });
-
-      setProgress(0);
       const result = await analyzeLocalVideo(file, setProgress, { environment });
+      setCurrentStep("saving_results");
       await updateAnalysis(id, {
         status: "completed",
         metrics: result.metrics,
@@ -202,7 +240,12 @@ function Content() {
 
   return (
     <AppShell title="Nouvelle analyse" subtitle="Import vidéo biomécanique">
-      <div className="notice-card">
+      {isCloudVideoStorageEnabled && (
+        <div className="notice-card">
+          La video sera envoyee vers Firebase Storage avec un upload resumable pour permettre le traitement serveur.
+        </div>
+      )}
+      <div className="notice-card" hidden={isCloudVideoStorageEnabled}>
         La vidéo restera stockée localement dans ce navigateur. Elle ne sera jamais envoyée vers Firebase.
       </div>
       <div className="analysis-all-in-one-note">
@@ -293,7 +336,7 @@ function Content() {
           <label className="upload-zone">
             <Upload />
             <strong>Choisir une vidéo</strong>
-            <small>MP4, MOV, M4V, WebM ou AVI · {MAX_VIDEO_SIZE_MB} Mo maximum</small>
+            <small>MP4, MOV, M4V, WebM ou AVI · jusqu&apos;à {(MAX_VIDEO_SIZE_MB / 1024).toFixed(0)} Go</small>
             <input
               aria-label="Importer une vidéo"
               type="file"
@@ -308,7 +351,7 @@ function Content() {
         {busy && (
           <div className="progress-track" aria-label="Progression de l’analyse">
             <span style={{ width: `${progress}%` }} />
-            <small>{progress}% analysé</small>
+            <small>{stepLabels[currentStep]} · {progress}%</small>
           </div>
         )}
         {error && <div className="error-card">{error}</div>}

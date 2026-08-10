@@ -115,12 +115,12 @@ interface AnalysisViewModel {
 }
 
 const phaseInfo: Record<PhaseName, { label: string; short: string; color: string; asset: string }> = {
-  catch: { label: "Catch", short: "Catch", color: "#1597ff", asset: "/rowing-phases/catch.svg" },
-  leg_drive: { label: "Leg Drive", short: "Leg Drive", color: "#1fd18a", asset: "/rowing-phases/leg-drive.svg" },
-  mid_drive: { label: "Mid Drive", short: "Mid Drive", color: "#ffbd24", asset: "/rowing-phases/mid-drive.svg" },
-  finish: { label: "Finish", short: "Finish", color: "#9b63ff", asset: "/rowing-phases/finish.svg" },
-  early_recovery: { label: "Early Recovery", short: "Early Recovery", color: "#ef4b89", asset: "/rowing-phases/early-recovery.svg" },
-  late_recovery: { label: "Late Recovery", short: "Late Recovery", color: "#19d3f3", asset: "/rowing-phases/late-recovery.svg" },
+  catch: { label: "Catch", short: "Catch", color: "#1597ff", asset: "/rowing-phases/neon-catch.png" },
+  leg_drive: { label: "Leg Drive", short: "Leg Drive", color: "#1fd18a", asset: "/rowing-phases/neon-leg-drive.png" },
+  mid_drive: { label: "Mid Drive", short: "Mid Drive", color: "#ffbd24", asset: "/rowing-phases/neon-mid-drive.png" },
+  finish: { label: "Finish", short: "Finish", color: "#9b63ff", asset: "/rowing-phases/neon-finish.png" },
+  early_recovery: { label: "Early Recovery", short: "Early Recovery", color: "#ef4b89", asset: "/rowing-phases/neon-early-recovery.png" },
+  late_recovery: { label: "Late Recovery", short: "Late Recovery", color: "#19d3f3", asset: "/rowing-phases/neon-late-recovery.png" },
 };
 
 const disciplineLabels: Record<RowingAnalysis["environment"], string> = {
@@ -173,8 +173,32 @@ function dateLabel(value: unknown) {
   return "Date non renseignee";
 }
 
-function normalizeSamples(samples?: MetricSample[]) {
-  return (samples ?? []).filter((item) => typeof item.time === "number" && typeof item.value === "number").map((item) => ({ time: item.time, value: item.value }));
+function clampPercent(value: number | null | undefined) {
+  if (value == null || Number.isNaN(value)) return null;
+  return Math.max(0, Math.min(100, value));
+}
+
+function normalizeSamples(samples?: MetricSample[], options: { smooth?: boolean; maxPoints?: number } = {}) {
+  const clean = (samples ?? [])
+    .filter((item) => Number.isFinite(item.time) && Number.isFinite(item.value))
+    .map((item) => ({ time: item.time, value: item.value }));
+  if (!clean.length) return [];
+  const windowSize = options.smooth === false ? 1 : 5;
+  const smoothed = clean.map((sample, index) => {
+    const from = Math.max(0, index - Math.floor(windowSize / 2));
+    const to = Math.min(clean.length, index + Math.floor(windowSize / 2) + 1);
+    const group = clean.slice(from, to);
+    return { time: sample.time, value: group.reduce((sum, item) => sum + item.value, 0) / group.length };
+  });
+  const maxPoints = options.maxPoints ?? 180;
+  if (smoothed.length <= maxPoints) return smoothed;
+  const step = Math.ceil(smoothed.length / maxPoints);
+  return smoothed.filter((_, index) => index % step === 0 || index === smoothed.length - 1);
+}
+
+function averageConfidence(strokes: ViewStroke[]) {
+  const values = strokes.map((stroke) => stroke.confidence).filter((value): value is number => typeof value === "number" && Number.isFinite(value));
+  return values.length ? Math.round((values.reduce((sum, value) => sum + value, 0) / values.length) * 100) : null;
 }
 
 function fallbackCycles(analysis: RowingAnalysis): StrokeCycle[] {
@@ -254,18 +278,18 @@ function buildViewModel(analysis: RowingAnalysis): AnalysisViewModel {
     trunk: normalizeSamples(analysis.timelines?.backAngle),
     elbow: normalizeSamples(analysis.timelines?.elbowAngle),
     shoulder: normalizeSamples(analysis.timelines?.shoulderAngle),
-    power: normalizeSamples(analysis.biomechanics?.powerCurve?.points?.map((point) => ({ time: point.strokePercent, value: point.power ?? 0 }))),
+    power: normalizeSamples(analysis.biomechanics?.powerCurve?.points?.filter((point) => point.power != null).map((point) => ({ time: point.strokePercent, value: point.power ?? 0 }))),
     cadence: normalizeSamples(analysis.cadenceTimeline ?? analysis.timelines?.cadence),
   };
   const muscle = analysis.muscleUsage;
   const muscleActivations = [
-    { muscle: "legs", label: "Jambes", activation: muscle?.legs ?? analysis.muscleEstimation?.groups.legs ?? null, asset: "/biomechanics/muscle-legs.png" },
+    { muscle: "legs", label: "Jambes", activation: muscle?.legs ?? analysis.muscleEstimation?.groups.legs ?? analysis.muscleEstimation?.groups.Jambes ?? null, asset: "/biomechanics/muscle-legs.png" },
     { muscle: "glutes", label: "Fessiers", activation: analysis.muscleEstimation?.groups.glutes ?? null, asset: "/biomechanics/muscle-legs.png" },
-    { muscle: "core", label: "Tronc / Gainage", activation: muscle?.core ?? analysis.muscleEstimation?.groups.core ?? null, asset: "/biomechanics/muscle-core.png" },
-    { muscle: "back", label: "Dos", activation: muscle?.back ?? analysis.muscleEstimation?.groups.back ?? null, asset: "/biomechanics/muscle-back.png" },
-    { muscle: "arms", label: "Bras", activation: muscle?.arms ?? analysis.muscleEstimation?.groups.arms ?? null, asset: "/biomechanics/muscle-arms.png" },
-    { muscle: "shoulders", label: "Epaules", activation: muscle?.shoulders ?? analysis.muscleEstimation?.groups.shoulders ?? null, asset: "/biomechanics/muscle-shoulders.png" },
-  ].map((row) => ({ ...row, confidence: analysis.muscleEstimation?.confidence ?? null, trend: [] as TimePoint[] }));
+    { muscle: "core", label: "Tronc / Gainage", activation: muscle?.core ?? analysis.muscleEstimation?.groups.core ?? analysis.muscleEstimation?.groups.Gainage ?? null, asset: "/biomechanics/muscle-core.png" },
+    { muscle: "back", label: "Dos", activation: muscle?.back ?? analysis.muscleEstimation?.groups.back ?? analysis.muscleEstimation?.groups.Dos ?? null, asset: "/biomechanics/muscle-back.png" },
+    { muscle: "arms", label: "Bras", activation: muscle?.arms ?? analysis.muscleEstimation?.groups.arms ?? analysis.muscleEstimation?.groups.Bras ?? null, asset: "/biomechanics/muscle-arms.png" },
+    { muscle: "shoulders", label: "Epaules", activation: muscle?.shoulders ?? analysis.muscleEstimation?.groups.shoulders ?? analysis.muscleEstimation?.groups.Epaules ?? null, asset: "/biomechanics/muscle-shoulders.png" },
+  ].map((row) => ({ ...row, activation: clampPercent(row.activation), confidence: analysis.muscleEstimation?.confidence ?? null, trend: [] as TimePoint[] }));
   const recommendations = analysis.recommendations ?? [];
   const errors = analysis.errors ?? [];
   return {
@@ -282,17 +306,17 @@ function buildViewModel(analysis: RowingAnalysis): AnalysisViewModel {
       averageCadence: analysis.metrics.strokeRate,
       averagePower: analysis.metrics.estimatedPower,
       technicalScore: scoreOnTen(analysis.technicalScore),
-      globalConfidence: analysis.progress?.progress === 100 ? 94 : null,
+      globalConfidence: averageConfidence(strokes),
     },
     strokes,
     biomechanics,
     muscleAnalysis: { activations: muscleActivations, distribution: [
-      { label: "Membres inferieurs", value: muscle?.legs ?? null },
-      { label: "Dos", value: muscle?.back ?? null },
-      { label: "Epaules", value: muscle?.shoulders ?? null },
-      { label: "Bras", value: muscle?.arms ?? null },
-      { label: "Gainage", value: muscle?.core ?? null },
-      { label: "Mobilite", value: analysis.metrics.rhythmScore ?? null },
+      { label: "Membres inferieurs", value: clampPercent(muscle?.legs) },
+      { label: "Dos", value: clampPercent(muscle?.back) },
+      { label: "Epaules", value: clampPercent(muscle?.shoulders) },
+      { label: "Bras", value: clampPercent(muscle?.arms) },
+      { label: "Gainage", value: clampPercent(muscle?.core) },
+      { label: "Mobilite", value: clampPercent(analysis.metrics.rhythmScore) },
     ], emg: null },
     crewAnalysis: analysis.crewAnalysis ?? null,
     conclusions: {
@@ -313,10 +337,16 @@ function seriesPath(samples: TimePoint[], width = 100, height = 100) {
   const min = Math.min(...values);
   const max = Math.max(...values);
   const spread = Math.max(max - min, 1);
-  return samples.map((sample, index) => {
+  const points = samples.map((sample, index) => {
     const x = (index / Math.max(samples.length - 1, 1)) * width;
     const y = height - ((sample.value - min) / spread) * (height * 0.78) - height * 0.1;
-    return `${index === 0 ? "M" : "L"} ${x.toFixed(2)} ${y.toFixed(2)}`;
+    return { x, y };
+  });
+  return points.map((point, index) => {
+    if (index === 0) return `M ${point.x.toFixed(2)} ${point.y.toFixed(2)}`;
+    const previous = points[index - 1];
+    const controlX = (previous.x + point.x) / 2;
+    return `Q ${controlX.toFixed(2)} ${previous.y.toFixed(2)} ${point.x.toFixed(2)} ${point.y.toFixed(2)}`;
   }).join(" ");
 }
 
@@ -488,7 +518,7 @@ function RowingStrokeCycle({ stroke, activePhase, currentTime, onSeek }: { strok
       <svg viewBox="0 0 380 150" aria-label="Cycle du coup avec phases">
         <path d={path} />
         <line className="cycle-cursor" x1={cursorX} x2={cursorX} y1="24" y2="128" />
-        {points.map(({ phase, x, y }) => <button key={phase.id} onClick={() => onSeek(phase.startTime)}><circle cx={x} cy={y} r={activePhase?.id === phase.id ? 8 : 6} style={{ fill: phaseInfo[phase.name].color }} /></button>)}
+        {points.map(({ phase, x, y }) => <circle key={phase.id} cx={x} cy={y} r={activePhase?.id === phase.id ? 8 : 6} tabIndex={0} role="button" aria-label={phaseInfo[phase.name].label} style={{ fill: phaseInfo[phase.name].color }} onClick={() => onSeek(phase.startTime)} />)}
       </svg>
       <div className="cycle-phase-strip">{stroke.phases.map((phase) => <PhaseIllustration phase={phase} active={activePhase?.id === phase.id} key={phase.id} onClick={() => onSeek(phase.startTime)} />)}</div>
     </section>
@@ -625,13 +655,13 @@ function PhaseEvaluation({ stroke }: { stroke: ViewStroke | null }) {
   );
 }
 
-function MuscleAnalysis({ vm, currentTime }: { vm: AnalysisViewModel; currentTime: number }) {
+function MuscleAnalysis({ vm }: { vm: AnalysisViewModel }) {
   const muscle = vm.muscleAnalysis;
   return (
     <section className="muscle-analysis-grid">
       <article className="analysis-ref-card muscle-cards-panel">
         <h2>Groupes musculaires <small>(activation moyenne)</small></h2>
-        <div>{muscle?.activations.map((item) => <article key={item.muscle}><Image src={item.asset} alt={item.label} width={88} height={132} /><span style={{ background: `conic-gradient(#1597ff ${item.activation ?? 0}%, #14344c 0)` }}><b>{item.activation == null ? "—" : `${Math.round(item.activation)}%`}</b></span><strong>{item.label}</strong><MultiLineMini samples={item.trend} color="#1fd18a" currentTime={currentTime} /></article>)}</div>
+        <div>{muscle?.activations.map((item) => <article key={item.muscle}><Image src={item.asset} alt={item.label} width={88} height={132} /><span style={{ background: `conic-gradient(#1597ff ${item.activation ?? 0}%, #14344c 0)` }}><b>{item.activation == null ? "—" : `${Math.round(item.activation)}%`}</b></span><strong>{item.label}</strong><small>{item.activation == null ? "Non disponible" : item.confidence == null ? "Estimation biomecanique" : `Confiance ${item.confidence}%`}</small></article>)}</div>
       </article>
       <article className="analysis-ref-card muscle-distribution">
         <h2>Repartition de l&apos;utilisation musculaire</h2>
@@ -816,7 +846,7 @@ function Detail({ id }: { id: string }) {
               <DetectedCycles strokes={vm.strokes} selected={selectedStroke} onSelect={selectStroke} />
               <PhaseEvaluation stroke={stroke} />
             </section>
-            <MuscleAnalysis vm={vm} currentTime={currentTime} />
+            <MuscleAnalysis vm={vm} />
             <section className="crew-movement-grid">
               <CrewAnalysis vm={vm} />
               <div>
