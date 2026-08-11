@@ -737,6 +737,8 @@ h1 span { color:#3485ff; }
 .training-empty-state{display:grid;justify-items:center;gap:8px;padding:24px 10px;text-align:center;color:#91a5b7}
 .training-empty-state>svg{width:38px;height:38px;color:#318cff}
 .training-empty-state strong{color:#dce8f2}.training-empty-state small{line-height:1.5}
+
+.technical-watch-table>header,.technical-watch-table>article{grid-template-columns:210px 110px 120px 70px 110px 90px minmax(180px,1fr) 58px}
 .calendar-month-label{text-transform:capitalize}
 .calendar-weekday{color:#8fa3b5;font-weight:700}
 
