@@ -17,6 +17,8 @@
     "migrate:athletes": "node --experimental-strip-types scripts/migrate-athletes.ts",
     "migrate:analyses:dry": "node --experimental-strip-types scripts/migrate-analyses.ts --dry-run",
     "migrate:analyses": "node --experimental-strip-types scripts/migrate-analyses.ts",
+    "firebase:reset-dynamic:dry": "node scripts/reset-dynamic-data.mjs",
+    "firebase:reset-dynamic": "node scripts/reset-dynamic-data.mjs",
     "check": "npm run typecheck && npm run lint && npm run test && npm run build"
   },
   "dependencies": {

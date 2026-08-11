@@ -1,5 +1,6 @@
 import { collection, getDocs, limit, query, where } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { DATA_UNAVAILABLE } from "@/lib/data-availability";
 import { listAnalyses } from "@/services/analysis-service";
 import { createUserProfile } from "@/services/auth-service";
 import type { RowingAnalysis } from "@/types/analysis";
@@ -34,7 +35,7 @@ function numberLabel(value: number) {
 }
 
 function average(values: number[]) {
-  if (!values.length) return 0;
+  if (!values.length) return null;
   return values.reduce((sum, value) => sum + value, 0) / values.length;
 }
 
@@ -74,11 +75,11 @@ async function listUsers(role: UserRole, filters: { clubId?: string | null; coac
 function athleteKpis(analyses: RowingAnalysis[]): DashboardKpi[] {
   const metrics = completedMetrics(analyses);
   return [
-    { label: "Distance totale", value: "0", unit: "km" },
-    { label: "Temps total", value: `${Math.floor(metrics.totalSeconds / 3600)}h`, tone: "green" },
-    { label: "Puissance moyenne", value: metrics.averagePower ? String(Math.round(metrics.averagePower)) : "0", unit: "W", tone: "purple" },
-    { label: "Cadence moyenne", value: metrics.averageCadence ? String(Math.round(metrics.averageCadence)) : "0", unit: "spm" },
-    { label: "Score technique", value: metrics.averageScore ? metrics.averageScore.toFixed(1) : "0", unit: "/100", tone: "green" },
+    { label: "Distance totale", value: DATA_UNAVAILABLE, unit: "km" },
+    { label: "Temps total", value: metrics.totalSeconds ? `${Math.floor(metrics.totalSeconds / 3600)}h` : DATA_UNAVAILABLE, tone: "green" },
+    { label: "Puissance moyenne", value: metrics.averagePower == null ? DATA_UNAVAILABLE : String(Math.round(metrics.averagePower)), unit: "W", tone: "purple" },
+    { label: "Cadence moyenne", value: metrics.averageCadence == null ? DATA_UNAVAILABLE : String(Math.round(metrics.averageCadence)), unit: "spm" },
+    { label: "Score technique", value: metrics.averageScore == null ? DATA_UNAVAILABLE : metrics.averageScore.toFixed(1), unit: "/100", tone: "green" },
     { label: "Nombre d'analyses", value: numberLabel(analyses.length) },
   ];
 }
@@ -89,7 +90,7 @@ export async function getAthleteDashboardData(profile: UserProfile): Promise<Rol
     analyses,
     kpis: athleteKpis(analyses),
     rows: analyses.slice(0, 6).map((analysis) => ({
-      cells: [analysis.fileName || analysis.athleteName || "Analyse", analysis.status, analysis.technicalScore ? `${analysis.technicalScore}/100` : "-"],
+      cells: [analysis.fileName || analysis.athleteName || DATA_UNAVAILABLE, analysis.status, analysis.technicalScore == null ? DATA_UNAVAILABLE : `${analysis.technicalScore}/100`],
       href: `/analyses/${analysis.id}`,
     })),
     alerts: [],
@@ -104,14 +105,14 @@ export async function getCoachDashboardData(profile: UserProfile): Promise<RoleD
     kpis: [
       { label: "Athletes actifs", value: numberLabel(athletes.filter((athlete) => athlete.active).length), tone: "green" },
       { label: "Analyses cette semaine", value: numberLabel(analyses.length) },
-      { label: "Volume d'entrainement", value: `${Math.floor(metrics.totalSeconds / 3600)}h` },
-      { label: "Heures totales", value: `${Math.floor(metrics.totalSeconds / 3600)}h`, tone: "purple" },
+      { label: "Volume d'entrainement", value: metrics.totalSeconds ? `${Math.floor(metrics.totalSeconds / 3600)}h` : DATA_UNAVAILABLE },
+      { label: "Heures totales", value: metrics.totalSeconds ? `${Math.floor(metrics.totalSeconds / 3600)}h` : DATA_UNAVAILABLE, tone: "purple" },
       { label: "Seances realisees", value: numberLabel(metrics.completed.length) },
-      { label: "Score technique equipe", value: metrics.averageScore ? metrics.averageScore.toFixed(1) : "0", unit: "/100", tone: "green" },
-      { label: "Alertes fatigue", value: "0", tone: "yellow" },
+      { label: "Score technique equipe", value: metrics.averageScore == null ? DATA_UNAVAILABLE : metrics.averageScore.toFixed(1), unit: "/100", tone: "green" },
+      { label: "Alertes fatigue", value: DATA_UNAVAILABLE, tone: "yellow" },
     ],
     rows: athletes.map((athlete) => ({
-      cells: [`${athlete.firstName} ${athlete.lastName}`.trim() || athlete.email, "0 km", "0h", "0", "-", "-", "Stable"],
+      cells: [`${athlete.firstName} ${athlete.lastName}`.trim() || athlete.email || DATA_UNAVAILABLE, DATA_UNAVAILABLE, DATA_UNAVAILABLE, DATA_UNAVAILABLE, DATA_UNAVAILABLE, DATA_UNAVAILABLE, DATA_UNAVAILABLE],
       href: `/coach/athletes/${athlete.uid}`,
     })),
     alerts: [],
@@ -131,12 +132,12 @@ export async function getClubDashboardData(profile: UserProfile): Promise<RoleDa
       { label: "Athletes", value: numberLabel(athletes), tone: "green" },
       { label: "Coaches", value: numberLabel(coaches) },
       { label: "Seances du mois", value: numberLabel(metrics.completed.length) },
-      { label: "Heures entrainement", value: `${Math.floor(metrics.totalSeconds / 3600)}h`, tone: "purple" },
-      { label: "Distance totale", value: "0", unit: "km" },
+      { label: "Heures entrainement", value: metrics.totalSeconds ? `${Math.floor(metrics.totalSeconds / 3600)}h` : DATA_UNAVAILABLE, tone: "purple" },
+      { label: "Distance totale", value: DATA_UNAVAILABLE, unit: "km" },
       { label: "Competitions", value: "0" },
       { label: "Analyses", value: numberLabel(analyses.length) },
     ],
-    rows: analyses.slice(0, 8).map((analysis) => ({ cells: [analysis.athleteName, analysis.status, analysis.technicalScore ? `${analysis.technicalScore}/100` : "-"], href: `/analyses/${analysis.id}` })),
+    rows: analyses.slice(0, 8).map((analysis) => ({ cells: [analysis.athleteName || DATA_UNAVAILABLE, analysis.status, analysis.technicalScore == null ? DATA_UNAVAILABLE : `${analysis.technicalScore}/100`], href: `/analyses/${analysis.id}` })),
     alerts: [],
   };
 }
@@ -156,11 +157,11 @@ export async function getTechnicalDirectorDashboardData(profile: UserProfile): P
       { label: "Athletes suivis", value: numberLabel(athletes), tone: "green" },
       { label: "Coaches actifs", value: numberLabel(coaches) },
       { label: "Analyses cette semaine", value: numberLabel(analyses.length) },
-      { label: "Volume total", value: `${Math.floor(metrics.totalSeconds / 3600)}h` },
-      { label: "Score technique moyen", value: metrics.averageScore ? metrics.averageScore.toFixed(1) : "0", unit: "/100", tone: "purple" },
-      { label: "Charge equipe", value: "0", unit: "/10" },
-      { label: "Athletes en progression", value: "0", tone: "green" },
-      { label: "Alertes performance", value: "0", tone: "yellow" },
+      { label: "Volume total", value: metrics.totalSeconds ? `${Math.floor(metrics.totalSeconds / 3600)}h` : DATA_UNAVAILABLE },
+      { label: "Score technique moyen", value: metrics.averageScore == null ? DATA_UNAVAILABLE : metrics.averageScore.toFixed(1), unit: "/100", tone: "purple" },
+      { label: "Charge equipe", value: DATA_UNAVAILABLE, unit: "/10" },
+      { label: "Athletes en progression", value: DATA_UNAVAILABLE, tone: "green" },
+      { label: "Alertes performance", value: DATA_UNAVAILABLE, tone: "yellow" },
     ],
     rows: [],
     alerts: [],
@@ -183,12 +184,12 @@ export async function getSuperAdminDashboardData(profile: UserProfile): Promise<
       { label: "Coaches", value: numberLabel(coaches) },
       { label: "Directeurs techniques", value: numberLabel(directors), tone: "purple" },
       { label: "Clubs", value: numberLabel(clubs) },
-      { label: "Competitions", value: "0" },
+      { label: "Competitions", value: DATA_UNAVAILABLE },
       { label: "Jury / Jurees", value: numberLabel(jury) },
       { label: "Analyses totales", value: numberLabel(analyses.length) },
       { label: "Utilisateurs actifs", value: numberLabel(athletes + coaches + directors + jury) },
     ],
-    rows: analyses.slice(0, 8).map((analysis) => ({ cells: [analysis.athleteName, analysis.status, analysis.clubId ?? "-"], href: `/analyses/${analysis.id}` })),
+    rows: analyses.slice(0, 8).map((analysis) => ({ cells: [analysis.athleteName || DATA_UNAVAILABLE, analysis.status, analysis.clubId ?? DATA_UNAVAILABLE], href: `/analyses/${analysis.id}` })),
     alerts: [],
   };
 }
@@ -198,11 +199,11 @@ export async function getJuryDashboardData(): Promise<RoleDashboardData> {
     analyses: [],
     kpis: [
       { label: "Competitions assignees", value: "0" },
-      { label: "Courses aujourd'hui", value: "0" },
-      { label: "Departs", value: "0" },
-      { label: "Resultats a valider", value: "0", tone: "yellow" },
-      { label: "Penalites", value: "0" },
-      { label: "Protestations", value: "0" },
+      { label: "Courses aujourd'hui", value: DATA_UNAVAILABLE },
+      { label: "Departs", value: DATA_UNAVAILABLE },
+      { label: "Resultats a valider", value: DATA_UNAVAILABLE, tone: "yellow" },
+      { label: "Penalites", value: DATA_UNAVAILABLE },
+      { label: "Protestations", value: DATA_UNAVAILABLE },
     ],
     rows: [],
     alerts: [],
