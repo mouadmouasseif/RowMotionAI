@@ -114,7 +114,7 @@ export default function LoginPage() {
           <p>Analysez les mouvements d&apos;un rameur sur ergometre ou dans le bateau grace a l&apos;intelligence artificielle, a la vision par ordinateur et aux donnees de performance.</p>
         </motion.div>
         <div className="row-login-rower-visual" aria-hidden="true">
-          <Image src="/rowing-analysis.png" alt="" fill priority sizes="(max-width: 1023px) 100vw, 53vw" />
+          <Image src="/rowing-login-hero.png" alt="" fill priority sizes="(max-width: 1023px) 100vw, 53vw" />
         </div>
       </section>
 
