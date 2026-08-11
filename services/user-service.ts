@@ -121,10 +121,12 @@ export async function removePersonalBest(uid: string, performanceId: string) {
 
 export async function listCoaches(profile: UserProfile): Promise<UserProfile[]> {
   if (!auth?.currentUser || !db || !["SUPER_ADMIN", "CLUB_ADMIN"].includes(profile.role) || !profile.active) throw new Error("Accès réservé à l’administration.");
-  const constraints = [where("role", "==", "COACH")];
+  const constraints = [];
   if (profile.role === "CLUB_ADMIN") { if (!profile.clubId) return []; constraints.push(where("clubId", "==", profile.clubId)); }
   const snapshot = await getDocs(query(collection(db, "users"), ...constraints));
-  return snapshot.docs.map((item) => createUserProfile(item.id, typeof item.data().email === "string" ? item.data().email : null, item.data()));
+  return snapshot.docs
+    .filter((item) => normalizeUserRole(item.data().role) === "COACH")
+    .map((item) => createUserProfile(item.id, typeof item.data().email === "string" ? item.data().email : null, item.data()));
 }
 
 export async function setCoachActive(profile: UserProfile, coachUid: string, active: boolean) {

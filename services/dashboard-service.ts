@@ -1,10 +1,10 @@
-import { collection, getDocs, limit, query, where } from "firebase/firestore";
+import { collection, getDocs, query, where } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { DATA_UNAVAILABLE } from "@/lib/data-availability";
 import { listAnalyses } from "@/services/analysis-service";
 import { createUserProfile } from "@/services/auth-service";
 import type { RowingAnalysis } from "@/types/analysis";
-import type { UserProfile, UserRole } from "@/types/user";
+import { normalizeUserRole, type UserProfile, type UserRole } from "@/types/user";
 
 export interface DashboardKpi {
   label: string;
@@ -55,21 +55,30 @@ function completedMetrics(analyses: RowingAnalysis[]) {
 
 async function countUsers(role: UserRole, filters: { clubId?: string | null; coachId?: string | null; clubIds?: string[] } = {}) {
   const database = requireDb();
-  const constraints = [where("role", "==", role)];
+  const constraints = [];
   if (filters.clubId) constraints.push(where("clubId", "==", filters.clubId));
   if (filters.coachId) constraints.push(where("coachId", "==", filters.coachId));
   if (filters.clubIds?.length === 1) constraints.push(where("clubId", "==", filters.clubIds[0]));
   const snapshot = await getDocs(query(collection(database, "users"), ...constraints));
-  return snapshot.size;
+  return snapshot.docs.filter((item) => normalizeUserRole(item.data().role) === role).length;
 }
 
 async function listUsers(role: UserRole, filters: { clubId?: string | null; coachId?: string | null } = {}, max = 8) {
   const database = requireDb();
-  const constraints = [where("role", "==", role), limit(max)];
+  const constraints = [];
   if (filters.clubId) constraints.push(where("clubId", "==", filters.clubId));
   if (filters.coachId) constraints.push(where("coachId", "==", filters.coachId));
   const snapshot = await getDocs(query(collection(database, "users"), ...constraints));
-  return snapshot.docs.map((item) => createUserProfile(item.id, typeof item.data().email === "string" ? item.data().email : null, item.data()));
+  return snapshot.docs
+    .filter((item) => normalizeUserRole(item.data().role) === role)
+    .slice(0, max)
+    .map((item) => createUserProfile(item.id, typeof item.data().email === "string" ? item.data().email : null, item.data()));
+}
+
+async function countCollection(collectionName: string) {
+  const database = requireDb();
+  const snapshot = await getDocs(collection(database, collectionName));
+  return snapshot.size;
 }
 
 function athleteKpis(analyses: RowingAnalysis[]): DashboardKpi[] {
@@ -169,13 +178,14 @@ export async function getTechnicalDirectorDashboardData(profile: UserProfile): P
 }
 
 export async function getSuperAdminDashboardData(profile: UserProfile): Promise<RoleDashboardData> {
-  const [analyses, athletes, coaches, directors, clubs, jury] = await Promise.all([
+  const [analyses, athletes, coaches, directors, clubs, jury, competitions] = await Promise.all([
     listAnalyses(profile, 120),
     countUsers("ATHLETE"),
     countUsers("COACH"),
     countUsers("TECHNICAL_DIRECTOR"),
-    getDocs(collection(requireDb(), "clubs")).then((snapshot) => snapshot.size),
+    countCollection("clubs"),
     countUsers("JURY"),
+    countCollection("competitions"),
   ]);
   return {
     analyses,
@@ -184,7 +194,7 @@ export async function getSuperAdminDashboardData(profile: UserProfile): Promise<
       { label: "Coaches", value: numberLabel(coaches) },
       { label: "Directeurs techniques", value: numberLabel(directors), tone: "purple" },
       { label: "Clubs", value: numberLabel(clubs) },
-      { label: "Competitions", value: DATA_UNAVAILABLE },
+      { label: "Competitions", value: numberLabel(competitions) },
       { label: "Jury / Jurees", value: numberLabel(jury) },
       { label: "Analyses totales", value: numberLabel(analyses.length) },
       { label: "Utilisateurs actifs", value: numberLabel(athletes + coaches + directors + jury) },
