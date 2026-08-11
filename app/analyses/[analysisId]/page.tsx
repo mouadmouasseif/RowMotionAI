@@ -1,41 +1,23 @@
 "use client";
 
 import Image from "next/image";
-import Link from "next/link";
 import { use, useEffect, useMemo, useRef, useState } from "react";
 import {
-  Activity,
   AlertTriangle,
-  BarChart3,
-  BookOpen,
   ChevronLeft,
   ChevronRight,
   Download,
-  FileVideo,
   Gauge,
-  HelpCircle,
-  LayoutDashboard,
-  Menu,
-  MessageSquare,
   MoreHorizontal,
   Pause,
   Play,
-  Radio,
-  Settings,
   Share2,
   ShieldCheck,
   SkipBack,
   SkipForward,
-  Sparkles,
-  Target,
-  Trophy,
-  Upload,
-  Users,
   Volume2,
-  Waves,
 } from "lucide-react";
-import { Brand } from "@/components/Brand";
-import { ProfileAvatar } from "@/components/profile/ProfileAvatar";
+import { AppShell } from "@/components/AppShell";
 import { ProtectedPage } from "@/components/ProtectedPage";
 import { downloadAnalysisPdf } from "@/lib/report-pdf";
 import { useAuth } from "@/providers/AuthProvider";
@@ -129,25 +111,6 @@ const disciplineLabels: Record<RowingAnalysis["environment"], string> = {
   ergometer: "Ergometre",
   beach_sprint: "Beach Sprint",
 };
-
-const navItems = [
-  ["Tableau de bord", "/athlete/dashboard", LayoutDashboard],
-  ["Analyses", "/analyses", FileVideo],
-  ["Progression", "/progression", BarChart3],
-  ["Plans d'entrainement", "/plans-entrainement", BookOpen],
-  ["Athletes", "/athletes", Users],
-  ["Comparaison", "/analyses", Activity],
-  ["Coach AI", "/mon-coach", Sparkles],
-  ["Competitions", "/competitions", Trophy],
-  ["Rapports", "/rapports", MessageSquare],
-  ["Parametres", "/parametres", Settings],
-] as const;
-
-const quickItems = [
-  ["Importer video", "/analyses/nouvelle", Upload],
-  ["Nouvelle analyse", "/analyses/nouvelle", Target],
-  ["Capture live", "/analyses/live", Radio],
-] as const;
 
 function scoreOnTen(value: number | null | undefined) {
   if (value == null) return null;
@@ -354,40 +317,9 @@ function EmptyState({ label }: { label: string }) {
   return <div className="analysis-ref-empty"><AlertTriangle /><span>{label}</span></div>;
 }
 
-function AnalysisSidebar({ open, onClose }: { open: boolean; onClose: () => void }) {
-  const { profile } = useAuth();
-  const name = `${profile?.firstName ?? ""} ${profile?.lastName ?? ""}`.trim() || profile?.displayName || "RowMotion";
-  return (
-    <>
-      {open && <button className="analysis-ref-overlay" aria-label="Fermer le menu" onClick={onClose} />}
-      <aside className={`analysis-ref-sidebar ${open ? "open" : ""}`}>
-        <Brand compact />
-        <Link className="analysis-ref-user" href="/profil">
-          <ProfileAvatar photoUrl={profile?.profilePhotoUrl} firstName={profile?.firstName ?? ""} lastName={profile?.lastName ?? ""} />
-          <span><strong>{name}</strong><small>{profile?.role === "SUPER_ADMIN" ? "Super Admin" : profile?.role ?? "Utilisateur"}</small></span>
-          <ChevronRight />
-        </Link>
-        <nav>
-          <small>Navigation</small>
-          {navItems.map(([label, href, Icon]) => <Link className={label === "Analyses" ? "active" : ""} href={href} key={label} onClick={onClose}><Icon />{label}</Link>)}
-        </nav>
-        <nav>
-          <small>Outils rapides</small>
-          {quickItems.map(([label, href, Icon]) => <Link href={href} key={label} onClick={onClose}><Icon />{label}</Link>)}
-        </nav>
-        <div className="analysis-ref-sidebar-bottom">
-          <Link href="/aide"><HelpCircle />Aide & support</Link>
-          <span><Waves />RowMotion AI <small>v2.0.0</small></span>
-        </div>
-      </aside>
-    </>
-  );
-}
-
-function AnalysisHeader({ vm, analysis, onMenu }: { vm: AnalysisViewModel; analysis: RowingAnalysis; onMenu: () => void }) {
+function AnalysisHeader({ vm, analysis }: { vm: AnalysisViewModel; analysis: RowingAnalysis }) {
   return (
     <header className="analysis-ref-header">
-      <button className="analysis-ref-menu" aria-label="Ouvrir le menu" onClick={onMenu}><Menu /></button>
       <div>
         <h1>Analyse video – {vm.boatType}</h1>
         <p>{vm.athleteName} • {vm.discipline} • {vm.distance ? `${vm.distance} m` : "Distance non disponible"} • {vm.createdLabel}</p>
@@ -790,7 +722,6 @@ function Detail({ id }: { id: string }) {
   const { profile } = useAuth();
   const [analysis, setAnalysis] = useState<RowingAnalysis | null>(null);
   const [error, setError] = useState("");
-  const [drawerOpen, setDrawerOpen] = useState(false);
   const [selectedStroke, setSelectedStroke] = useState(0);
   const [currentTime, setCurrentTime] = useState(0);
 
@@ -813,14 +744,14 @@ function Detail({ id }: { id: string }) {
   if (!profile) return null;
 
   return (
-    <main className="analysis-ref-page">
-      <AnalysisSidebar open={drawerOpen} onClose={() => setDrawerOpen(false)} />
+    <AppShell referenceMode title={vm ? `Analyse video - ${vm.boatType}` : "Analyse video"} subtitle={vm ? `${vm.athleteName} - ${vm.discipline}` : "Donnees Firebase"}>
+      <main className="analysis-ref-page analysis-ref-embedded">
       <section className="analysis-ref-main">
         {!vm || !analysis ? (
           <div className="analysis-ref-loading">{error ? <EmptyState label={error} /> : <EmptyState label="Chargement de l'analyse" />}</div>
         ) : (
           <>
-            <AnalysisHeader vm={vm} analysis={analysis} onMenu={() => setDrawerOpen(true)} />
+            <AnalysisHeader vm={vm} analysis={analysis} />
             <KpiRow vm={vm} />
             <section className="video-cycle-grid">
               <AnalysisVideoPlayer analysis={analysis} currentTime={currentTime} onTimeChange={setCurrentTime} />
@@ -867,6 +798,7 @@ function Detail({ id }: { id: string }) {
         )}
       </section>
     </main>
+    </AppShell>
   );
 }
 
