@@ -107,11 +107,7 @@ export default function LoginPage() {
     <main className="row-login-page">
       <section className="row-login-hero" aria-label="Presentation RowMotion AI">
         <motion.div className="row-login-brand-block" initial={false} animate={{ opacity: 1, y: 0 }}>
-          <div className="row-login-brand-mark"><span /></div>
-          <div>
-            <strong>RowMotion AI</strong>
-            <small>Better Technique. Better Performance.</small>
-          </div>
+          <Image className="row-login-logo" src="/logo-horizontal-dark.png" alt="RowMotion AI - Better Technique. Better Performance." width={332} height={88} priority />
         </motion.div>
         <motion.div className="row-login-copy" initial={false} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.08 }}>
           <h1>Analyse biomecanique intelligente pour <span>l&apos;aviron</span></h1>
