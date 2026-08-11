@@ -1,4 +1,4 @@
-import { collection, getDocs, query, where } from "firebase/firestore";
+import { collection, getDocs, orderBy, query, where, type QueryConstraint } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { DATA_UNAVAILABLE } from "@/lib/data-availability";
 import { listAnalyses } from "@/services/analysis-service";
@@ -81,6 +81,14 @@ async function countCollection(collectionName: string) {
   return snapshot.size;
 }
 
+async function countVisibleCompetitions(filters: { clubId?: string | null } = {}) {
+  const database = requireDb();
+  const constraints: QueryConstraint[] = [orderBy("startDate", "desc")];
+  if (filters.clubId) constraints.unshift(where("clubId", "==", filters.clubId));
+  const snapshot = await getDocs(query(collection(database, "competitions"), ...constraints));
+  return snapshot.size;
+}
+
 function athleteKpis(analyses: RowingAnalysis[]): DashboardKpi[] {
   const metrics = completedMetrics(analyses);
   return [
@@ -129,10 +137,11 @@ export async function getCoachDashboardData(profile: UserProfile): Promise<RoleD
 }
 
 export async function getClubDashboardData(profile: UserProfile): Promise<RoleDashboardData> {
-  const [analyses, athletes, coaches] = await Promise.all([
+  const [analyses, athletes, coaches, competitions] = await Promise.all([
     listAnalyses(profile, 100),
     countUsers("ATHLETE", { clubId: profile.clubId }),
     countUsers("COACH", { clubId: profile.clubId }),
+    countVisibleCompetitions({ clubId: profile.clubId }),
   ]);
   const metrics = completedMetrics(analyses);
   return {
@@ -143,7 +152,7 @@ export async function getClubDashboardData(profile: UserProfile): Promise<RoleDa
       { label: "Seances du mois", value: numberLabel(metrics.completed.length) },
       { label: "Heures entrainement", value: metrics.totalSeconds ? `${Math.floor(metrics.totalSeconds / 3600)}h` : DATA_UNAVAILABLE, tone: "purple" },
       { label: "Distance totale", value: DATA_UNAVAILABLE, unit: "km" },
-      { label: "Competitions", value: "0" },
+      { label: "Competitions", value: numberLabel(competitions) },
       { label: "Analyses", value: numberLabel(analyses.length) },
     ],
     rows: analyses.slice(0, 8).map((analysis) => ({ cells: [analysis.athleteName || DATA_UNAVAILABLE, analysis.status, analysis.technicalScore == null ? DATA_UNAVAILABLE : `${analysis.technicalScore}/100`], href: `/analyses/${analysis.id}` })),
@@ -185,7 +194,7 @@ export async function getSuperAdminDashboardData(profile: UserProfile): Promise<
     countUsers("TECHNICAL_DIRECTOR"),
     countCollection("clubs"),
     countUsers("JURY"),
-    countCollection("competitions"),
+    countVisibleCompetitions(),
   ]);
   return {
     analyses,
