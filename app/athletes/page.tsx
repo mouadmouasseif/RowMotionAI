@@ -15,6 +15,7 @@ import {
   UserPlus,
   Users,
 } from "lucide-react";
+import { CreateManagedUserDialog } from "@/components/admin/CreateManagedUserDialog";
 import { ManagedUserDialog } from "@/components/admin/ManagedUserDialog";
 import { AppShell } from "@/components/AppShell";
 import { ProtectedPage } from "@/components/ProtectedPage";
@@ -33,6 +34,7 @@ function AthletesContent() {
   const [clubs, setClubs] = useState<Club[]>([]);
   const [coaches, setCoaches] = useState<UserProfile[]>([]);
   const [selectedUser, setSelectedUser] = useState<UserProfile | null>(null);
+  const [createOpen, setCreateOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
@@ -91,10 +93,12 @@ function AthletesContent() {
       subtitle="Gérez les profils, les clubs et les affectations de coach."
       headerActions={
         <>
-          <Link className="button primary" href="/inscription">
-            <UserPlus />
-            Ajouter un athlète
-          </Link>
+          {profile.role === "SUPER_ADMIN" && (
+            <button className="button primary" type="button" onClick={() => setCreateOpen(true)}>
+              <UserPlus />
+              Ajouter un athlete
+            </button>
+          )}
           <button className="button ghost">
             <Download />
             Importer
@@ -263,6 +267,16 @@ function AthletesContent() {
             clubs={clubs}
             coaches={coaches}
             onClose={() => setSelectedUser(null)}
+            onSaved={load}
+          />
+        )}
+        {createOpen && (
+          <CreateManagedUserDialog
+            clubs={clubs}
+            coaches={coaches}
+            defaultRole="ATHLETE"
+            fixedRole
+            onClose={() => setCreateOpen(false)}
             onSaved={load}
           />
         )}

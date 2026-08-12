@@ -215,11 +215,11 @@ function SuperAdminDashboard() {
         <section className="superadmin-card quick-superadmin-actions">
           <h2>Actions rapides</h2>
           <div>
-            <Link href="/super-admin/users/new"><UserPlus />Ajouter un athlete</Link>
-            <Link href="/super-admin/users/new"><Users />Ajouter un coach</Link>
+            <Link href="/athletes"><UserPlus />Ajouter un athlete</Link>
+            <Link href="/coaches"><Users />Ajouter un coach</Link>
             <Link href="/super-admin/clubs"><Landmark />Creer un club</Link>
             <Link href="/competitions/nouvelle"><Trophy />Creer competition</Link>
-            <Link href="/super-admin/users/new"><Mic />Ajouter jury / juree</Link>
+            <Link href="/super-admin/users"><Mic />Ajouter jury / juree</Link>
             <Link href="/rapports"><ClipboardPlus />Generer rapport global</Link>
           </div>
         </section>
