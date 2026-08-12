@@ -25,12 +25,13 @@ const roleLabels: Record<UserRole, string> = {
   COACH: "COACH",
   CLUB_ADMIN: "Admin Club",
   TECHNICAL_DIRECTOR: "Directeur Technique",
+  FEDERATION_PRESIDENT: "President Federation",
   SUPER_ADMIN: "SUPER_ADMIN",
   JURY: "Jury",
 };
 
 function defaultActionForRole(role: UserRole) {
-  if (role === "TECHNICAL_DIRECTOR") return { href: "/rapports", label: "Rapport technique", icon: FileBarChart };
+  if (role === "TECHNICAL_DIRECTOR" || role === "FEDERATION_PRESIDENT") return { href: "/rapports", label: "Rapport technique", icon: FileBarChart };
   if (role === "CLUB_ADMIN") return { href: "/rapports", label: "Exporter rapport", icon: FileBarChart };
   if (role === "SUPER_ADMIN") return { href: "/rapports", label: "Rapport global", icon: FileBarChart };
   if (role === "JURY") return { href: "/jury/dashboard", label: "Acceder au live", icon: Radio };

@@ -39,8 +39,9 @@ export async function listAthletes(profile: UserProfile): Promise<UserProfile[]>
   if (!auth?.currentUser || !db) throw new Error("Session Firebase indisponible.");
   if (profile.role === "ATHLETE") return [profile];
   const users = collection(db, "users");
-  const scopeClubIds = profile.role === "TECHNICAL_DIRECTOR" ? profile.technicalScope?.clubIds ?? [] : [];
-  const shouldLoadAll = profile.role === "SUPER_ADMIN" || (profile.role === "TECHNICAL_DIRECTOR" && !profile.clubId && scopeClubIds.length === 0);
+  const scopedFederationRole = profile.role === "TECHNICAL_DIRECTOR" || profile.role === "FEDERATION_PRESIDENT";
+  const scopeClubIds = scopedFederationRole ? profile.technicalScope?.clubIds ?? [] : [];
+  const shouldLoadAll = profile.role === "SUPER_ADMIN" || (scopedFederationRole && (!profile.clubId && scopeClubIds.length === 0 || profile.technicalScope?.type === "FEDERATION"));
   const clubIds = Array.from(new Set([...(scopeClubIds ?? []), profile.clubId].filter((value): value is string => Boolean(value))));
   const queries = profile.role === "COACH"
     ? [query(users, where("coachId", "==", profile.uid)), query(users, where("coachIds", "array-contains", profile.uid))]
@@ -57,7 +58,7 @@ export async function listAthletes(profile: UserProfile): Promise<UserProfile[]>
       if (normalizeUserRole(data.role) !== "ATHLETE") return;
       const athlete = createUserProfile(item.id, typeof data.email === "string" ? data.email : null, data);
       const inScope = profile.role === "SUPER_ADMIN"
-        || (profile.role === "TECHNICAL_DIRECTOR" && (!scopeClubIds.length || Boolean(athlete.clubId && scopeClubIds.includes(athlete.clubId)) || athlete.clubId === profile.clubId))
+        || (scopedFederationRole && (profile.technicalScope?.type === "FEDERATION" || !scopeClubIds.length || Boolean(athlete.clubId && scopeClubIds.includes(athlete.clubId)) || athlete.clubId === profile.clubId))
         || (profile.role === "CLUB_ADMIN" && Boolean(profile.clubId && athlete.clubId === profile.clubId))
         || (profile.role === "COACH" && (athlete.coachId === profile.uid || athlete.coachIds?.includes(profile.uid)))
         || false;

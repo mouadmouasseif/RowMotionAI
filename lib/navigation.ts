@@ -31,8 +31,8 @@ export interface NavigationSection {
   items: NavigationItem[];
 }
 
-const all: UserRole[] = ["ATHLETE", "COACH", "CLUB_ADMIN", "SUPER_ADMIN"];
-const managers: UserRole[] = ["COACH", "CLUB_ADMIN", "SUPER_ADMIN"];
+const all: UserRole[] = ["ATHLETE", "COACH", "CLUB_ADMIN", "TECHNICAL_DIRECTOR", "FEDERATION_PRESIDENT", "SUPER_ADMIN", "JURY"];
+const managers: UserRole[] = ["COACH", "CLUB_ADMIN", "TECHNICAL_DIRECTOR", "FEDERATION_PRESIDENT", "SUPER_ADMIN"];
 
 export const navigationSections: NavigationSection[] = [
   {
@@ -50,7 +50,7 @@ export const navigationSections: NavigationSection[] = [
     items: [
       { label: "Compétitions", href: "/competitions", icon: Trophy, roles: all },
       { label: "Athlètes", href: "/athletes", icon: Users, roles: managers },
-      { label: "Coachs", href: "/coaches", icon: UserCog, roles: ["CLUB_ADMIN", "SUPER_ADMIN"] },
+      { label: "Coachs", href: "/coaches", icon: UserCog, roles: ["CLUB_ADMIN", "TECHNICAL_DIRECTOR", "FEDERATION_PRESIDENT", "SUPER_ADMIN"] },
       { label: "Clubs", href: "/clubs", icon: Building2, roles: ["SUPER_ADMIN"] },
       { label: "Mon coach", href: "/mon-coach", icon: UserCog, roles: ["ATHLETE"] },
       { label: "Mon club", href: "/mon-club", icon: Building2, roles: ["ATHLETE", "COACH", "CLUB_ADMIN"] },

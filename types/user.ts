@@ -1,6 +1,7 @@
 export type PublicRegistrationRole = "athlete" | "coach" | "club_admin";
 export type UserRole =
   | "SUPER_ADMIN"
+  | "FEDERATION_PRESIDENT"
   | "TECHNICAL_DIRECTOR"
   | "CLUB_ADMIN"
   | "COACH"
@@ -16,6 +17,10 @@ export type LegacyUserRole =
   | "super_admin"
   | "superadmin"
   | "super-admin"
+  | "federation_president"
+  | "federation-president"
+  | "president_federation"
+  | "president-de-federation"
   | "technical_director"
   | "technical-director"
   | "directeur_technique"
@@ -75,7 +80,7 @@ export interface UserProfile {
   } | null;
 }
 
-export const userRoles: UserRole[] = ["SUPER_ADMIN", "TECHNICAL_DIRECTOR", "CLUB_ADMIN", "COACH", "ATHLETE", "JURY"];
+export const userRoles: UserRole[] = ["SUPER_ADMIN", "FEDERATION_PRESIDENT", "TECHNICAL_DIRECTOR", "CLUB_ADMIN", "COACH", "ATHLETE", "JURY"];
 const legacyRoleMap: Record<LegacyUserRole, UserRole> = {
   athlete: "ATHLETE",
   coach: "COACH",
@@ -85,6 +90,10 @@ const legacyRoleMap: Record<LegacyUserRole, UserRole> = {
   super_admin: "SUPER_ADMIN",
   superadmin: "SUPER_ADMIN",
   "super-admin": "SUPER_ADMIN",
+  federation_president: "FEDERATION_PRESIDENT",
+  "federation-president": "FEDERATION_PRESIDENT",
+  president_federation: "FEDERATION_PRESIDENT",
+  "president-de-federation": "FEDERATION_PRESIDENT",
   technical_director: "TECHNICAL_DIRECTOR",
   "technical-director": "TECHNICAL_DIRECTOR",
   directeur_technique: "TECHNICAL_DIRECTOR",
@@ -107,6 +116,7 @@ export function getDashboardRouteByRole(role: UserRole | null | undefined): stri
   if (!role) return "/connexion";
   const paths: Record<UserRole, string> = {
     SUPER_ADMIN: "/super-admin/dashboard",
+    FEDERATION_PRESIDENT: "/technical-director/dashboard",
     TECHNICAL_DIRECTOR: "/technical-director/dashboard",
     CLUB_ADMIN: "/club/dashboard",
     COACH: "/coach/dashboard",

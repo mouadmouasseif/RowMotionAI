@@ -36,6 +36,7 @@ export type Permission =
 export const permissionsByRole: Record<UserRole, Permission[]> = {
   ATHLETE: ["analysis:create:self", "analysis:view:self", "training:view:self", "profile:edit:self", "competition:view:self"],
   COACH: ["athlete:view:assigned", "athlete:update:assigned", "analysis:view:assigned", "analysis:create:assigned", "training:create:assigned", "report:create:assigned"],
+  FEDERATION_PRESIDENT: ["athlete:view:scope", "coach:view:scope", "analysis:view:scope", "training:approve:scope", "technical-report:create:scope", "competition:view:scope", "selection:manage:scope", "report:view:club"],
   TECHNICAL_DIRECTOR: ["athlete:view:scope", "coach:view:scope", "analysis:view:scope", "training:create:scope", "training:approve:scope", "technical-report:create:scope", "competition:view:scope", "selection:manage:scope"],
   CLUB_ADMIN: ["club:manage:self", "coach:manage:club", "athlete:manage:club", "competition:manage:club", "jury:manage:club", "report:view:club"],
   SUPER_ADMIN: ["*"],

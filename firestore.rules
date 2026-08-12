@@ -6,6 +6,7 @@ service cloud.firestore {
     function isActive() { return isSignedIn() && profile().active == true; }
     function hasRole(role) { return isActive() && profile().role == role; }
     function isSuperAdmin() { return hasRole("SUPER_ADMIN"); }
+    function isFederationPresident() { return hasRole("FEDERATION_PRESIDENT"); }
     function isTechnicalDirector() { return hasRole("TECHNICAL_DIRECTOR"); }
     function isClubAdmin() { return hasRole("CLUB_ADMIN"); }
     function isCoach() { return hasRole("COACH"); }
@@ -14,9 +15,11 @@ service cloud.firestore {
     function isOwnUser(userId) { return isSignedIn() && request.auth.uid == userId; }
     function sameClub(clubId) { return isActive() && clubId != null && profile().clubId == clubId; }
     function inTechnicalScope(clubId) {
-      return isTechnicalDirector()
+      return (isTechnicalDirector() || isFederationPresident())
         && clubId != null
         && (
+          profile().technicalScope.type == "FEDERATION"
+          ||
           (profile().technicalScope.type == "CLUB" && clubId in profile().technicalScope.clubIds)
           || (profile().clubId == clubId)
         );

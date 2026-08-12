@@ -12,6 +12,7 @@ function requireFirebase() {
 
 export function canAccessAnalysis(profile: UserProfile, analysis: RowingAnalysis) {
   if (profile.role === "SUPER_ADMIN") return true;
+  if (profile.role === "FEDERATION_PRESIDENT") return profile.technicalScope?.type === "FEDERATION" || Boolean((profile.technicalScope?.clubIds ?? [profile.clubId]).includes(analysis.clubId ?? ""));
   if (profile.role === "TECHNICAL_DIRECTOR") return Boolean((profile.technicalScope?.clubIds ?? [profile.clubId]).includes(analysis.clubId ?? ""));
   if (profile.role === "CLUB_ADMIN") return Boolean(profile.clubId && profile.clubId === analysis.clubId);
   if (profile.role === "COACH") return profile.uid === analysis.coachId || profile.uid === analysis.createdBy;
@@ -22,6 +23,8 @@ export async function listAnalyses(profile: UserProfile, max = 100): Promise<Row
   const { database } = requireFirebase();
   const base = collection(database, "analyses");
   const constraints = profile.role === "SUPER_ADMIN" ? [orderBy("createdAt", "desc"), limit(max)]
+    : profile.role === "FEDERATION_PRESIDENT" && profile.technicalScope?.type === "FEDERATION" ? [orderBy("createdAt", "desc"), limit(max)]
+    : profile.role === "FEDERATION_PRESIDENT" && (profile.technicalScope?.clubIds[0] ?? profile.clubId) ? [where("clubId", "==", profile.technicalScope?.clubIds[0] ?? profile.clubId), limit(max)]
     : profile.role === "TECHNICAL_DIRECTOR" && (profile.technicalScope?.clubIds[0] ?? profile.clubId) ? [where("clubId", "==", profile.technicalScope?.clubIds[0] ?? profile.clubId), limit(max)]
     : profile.role === "CLUB_ADMIN" && profile.clubId ? [where("clubId", "==", profile.clubId), limit(max)]
     : profile.role === "COACH" ? [where("coachId", "==", profile.uid), limit(max)]

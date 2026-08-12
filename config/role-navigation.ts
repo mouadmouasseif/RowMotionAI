@@ -83,6 +83,15 @@ export const navigationByRole: Record<UserRole, RoleNavigationSection[]> = {
     { label: "Communication", items: [common.messages, common.notifications] },
     { label: "Parametres", items: [common.profile, { label: "Preferences", href: "/parametres", icon: Settings }] },
   ],
+  FEDERATION_PRESIDENT: [
+    { label: "Tableau de bord", items: [{ label: "Vue federation", href: "/technical-director/dashboard", icon: LayoutDashboard }, { label: "Activite en direct", href: "/technical-director/dashboard", icon: Radio }, { label: "Alertes performance", href: "/technical-director/dashboard", icon: Bell }] },
+    { label: "Supervision", items: [{ label: "Athletes", href: "/athletes", icon: Users }, { label: "Coaches", href: "/coaches", icon: UserCog }, { label: "Directeurs techniques", href: "/technical-director/dashboard", icon: ShieldCheck }, { label: "Athletes a surveiller", href: "/technical-director/athletes-a-surveiller", icon: HeartPulse }] },
+    { label: "Performance", items: [{ label: "Analyses", href: "/analyses", icon: FileVideo }, { label: "Progression", href: "/progression", icon: Activity }, { label: "Tests physiques", href: "/benchmarks", icon: Target }, { label: "Records", href: "/progression", icon: Medal }] },
+    { label: "Competitions", items: [{ label: "Calendrier", href: "/competitions/calendrier", icon: CalendarDays }, { label: "Competitions", href: "/competitions", icon: Trophy }, { label: "Selections", href: "/competitions", icon: Flag }, { label: "Resultats", href: "/competitions", icon: Medal }] },
+    { label: "Rapports", items: [{ label: "Rapport federation", href: "/rapports", icon: FileBarChart }, { label: "Statistiques", href: "/progression", icon: BarChart3 }] },
+    { label: "Communication", items: [common.messages, common.notifications] },
+    { label: "Parametres", items: [common.profile, common.settings] },
+  ],
   SUPER_ADMIN: [
     { label: "Tableau de bord", items: [{ label: "Vue d'ensemble", href: "/super-admin/dashboard", icon: LayoutDashboard }, { label: "Analyses generales", href: "/analyses", icon: FileVideo }, { label: "Activite temps reel", href: "/super-admin/dashboard", icon: Radio }] },
     { label: "Gestion globale", items: [{ label: "Athletes", href: "/super-admin/athletes", icon: Users }, { label: "Coaches", href: "/super-admin/coachs", icon: UserCog }, { label: "Directeurs techniques", href: "/super-admin/users", icon: ShieldCheck }, { label: "Clubs", href: "/super-admin/clubs", icon: Building2 }, { label: "Competitions", href: "/competitions", icon: Trophy }, { label: "Jury / Jurees", href: "/jury/dashboard", icon: ShieldCheck }, { label: "Plans d'entrainement", href: "/plans-entrainement", icon: BookOpen }] },

@@ -39,6 +39,11 @@ const roleCopy: Record<UserRole, { title: string; subtitle: (firstName: string) 
     subtitle: () => "Vue strategique multi-equipe et supervision de la performance sportive.",
     widgets: ["Indice de performance globale", "Etat des athletes", "Top progressions", "Athletes a surveiller", "Coaches", "Repartition entrainement", "Tests", "Biomecanique moyenne", "Puissance musculaire", "Prochaines competitions", "Planification", "Alertes"],
   },
+  FEDERATION_PRESIDENT: {
+    title: "President de federation",
+    subtitle: () => "Vue federation et supervision globale de la performance sportive.",
+    widgets: ["Indice de performance globale", "Etat des athletes", "Top progressions", "Athletes a surveiller", "Coaches", "Repartition entrainement", "Tests", "Biomecanique moyenne", "Puissance musculaire", "Prochaines competitions", "Planification", "Alertes"],
+  },
   SUPER_ADMIN: {
     title: "Tableau de bord Superadmin",
     subtitle: () => "Vue plateforme globale RowMotion AI.",
@@ -234,6 +239,7 @@ function useRoleDashboardData(role: UserRole | null, enabled: boolean) {
       COACH: () => getCoachDashboardData(profile),
       CLUB_ADMIN: () => getClubDashboardData(profile),
       TECHNICAL_DIRECTOR: () => getTechnicalDirectorDashboardData(profile),
+      FEDERATION_PRESIDENT: () => getTechnicalDirectorDashboardData(profile),
       SUPER_ADMIN: () => getSuperAdminDashboardData(profile),
       JURY: () => getJuryDashboardData(),
     } satisfies Record<UserRole, () => Promise<RoleDashboardData>>;
@@ -302,7 +308,7 @@ export function DashboardView({ previewRole }: { previewRole?: UserRole }) {
             })}
           </section>
 
-          {role === "TECHNICAL_DIRECTOR" && (
+          {(role === "TECHNICAL_DIRECTOR" || role === "FEDERATION_PRESIDENT") && (
             <section className="technical-hero reference-card">
               <div>
                 <small>Performance globale</small>

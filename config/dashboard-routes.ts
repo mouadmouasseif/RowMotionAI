@@ -4,6 +4,8 @@ export function getDashboardRouteByRole(role: UserRole | null | undefined): stri
   switch (role) {
     case "SUPER_ADMIN":
       return "/super-admin/dashboard";
+    case "FEDERATION_PRESIDENT":
+      return "/technical-director/dashboard";
     case "TECHNICAL_DIRECTOR":
       return "/technical-director/dashboard";
     case "CLUB_ADMIN":
