@@ -11,6 +11,7 @@ import {
 
 const disciplines: ProfileDiscipline[] = ["ERGOMETER", "SKIFF", "BEACH_ROWING"];
 const rolesWithFederationScope: UserRole[] = ["FEDERATION_PRESIDENT"];
+const clubManagedRoles: UserRole[] = ["ATHLETE", "COACH", "JURY"];
 
 function nullableString(value: unknown) {
   return typeof value === "string" && value.trim() ? value.trim() : null;
@@ -27,16 +28,17 @@ function responseError(reason: unknown) {
       ? 401
       : code === "FORBIDDEN"
         ? 403
-        : code === "INVALID_ROLE" || code === "INVALID_EMAIL" || code === "INVALID_PASSWORD"
+        : code === "INVALID_ROLE" || code === "INVALID_EMAIL" || code === "INVALID_PASSWORD" || code === "INVALID_COACH"
           ? 400
           : 500;
   const messages: Record<string, string> = {
     AUTH_REQUIRED: "Authentification requise.",
     ACCOUNT_INACTIVE: "Compte administrateur inactif.",
-    FORBIDDEN: "Action reservee au Super administrateur.",
+    FORBIDDEN: "Vous n'etes pas autorise a creer ce type de compte.",
     INVALID_ROLE: "Role invalide pour Firebase.",
     INVALID_EMAIL: "L'adresse e-mail est invalide.",
     INVALID_PASSWORD: "Le mot de passe doit contenir au moins 6 caracteres.",
+    INVALID_COACH: "Le coach selectionne est invalide ou appartient a un autre club.",
   };
   return Response.json(
     { success: false, error: { code, message: messages[code] ?? code } },
@@ -62,10 +64,14 @@ export async function POST(request: Request) {
   let createdUid: string | null = null;
   try {
     const actor = await requireApiUser(request);
-    if (actor.role !== "SUPER_ADMIN") throw new Error("FORBIDDEN");
     const body = (await request.json()) as Record<string, unknown>;
     const role = body.role;
     if (!isUserRole(role)) throw new Error("INVALID_ROLE");
+    const actorIsSuperAdmin = actor.role === "SUPER_ADMIN";
+    const actorIsClubAdmin = actor.role === "CLUB_ADMIN" && Boolean(actor.clubId);
+    if (!actorIsSuperAdmin && (!actorIsClubAdmin || !clubManagedRoles.includes(role))) {
+      throw new Error("FORBIDDEN");
+    }
 
     const email = nullableString(body.email)?.toLowerCase();
     const password = nullableString(body.password);
@@ -86,6 +92,20 @@ export async function POST(request: Request) {
     const selectedDisciplines =
       role === "ATHLETE" ? disciplines : [];
     const birthDate = nullableString(body.birthDate);
+    const clubId = actorIsClubAdmin ? actor.clubId : nullableString(body.clubId);
+    const coachId = role === "ATHLETE" ? nullableString(body.coachId) : null;
+    if (actorIsClubAdmin && !clubId) throw new Error("FORBIDDEN");
+    if (coachId) {
+      const coach = await db.doc(`users/${coachId}`).get();
+      if (
+        !coach.exists ||
+        coach.data()?.role !== "COACH" ||
+        !clubId ||
+        coach.data()?.clubId !== clubId
+      ) {
+        throw new Error("INVALID_COACH");
+      }
+    }
     const calculatedCategory =
       role === "ATHLETE" && birthDate
         ? getAthleteCategory(new Date(birthDate), new Date().getUTCFullYear())
@@ -100,8 +120,8 @@ export async function POST(request: Request) {
       role,
       active: body.active === true,
       onboardingCompleted: true,
-      clubId: nullableString(body.clubId),
-      coachId: role === "ATHLETE" ? nullableString(body.coachId) : null,
+      clubId,
+      coachId,
       coachIds: [],
       technicalScope: technicalScopeFrom(body, role),
       licenseNumber: nullableString(body.licenseNumber),

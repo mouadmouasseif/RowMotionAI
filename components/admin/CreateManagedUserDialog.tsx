@@ -31,6 +31,7 @@ export function CreateManagedUserDialog({
   coaches,
   defaultRole = "ATHLETE",
   fixedRole = false,
+  allowedRoles,
   onClose,
   onSaved,
 }: {
@@ -38,6 +39,7 @@ export function CreateManagedUserDialog({
   coaches: UserProfile[];
   defaultRole?: UserRole;
   fixedRole?: boolean;
+  allowedRoles?: UserRole[];
   onClose: () => void;
   onSaved: () => Promise<void> | void;
 }) {
@@ -87,6 +89,10 @@ export function CreateManagedUserDialog({
   };
 
   const availableCoaches = role === "ATHLETE" ? coaches : [];
+  const availableRoles = allowedRoles?.length
+    ? roleOptions.filter((option) => allowedRoles.includes(option.value))
+    : roleOptions;
+  const defaultClubId = clubs.length === 1 ? clubs[0].id : "";
 
   return (
     <div className="admin-dialog-backdrop" role="presentation" onMouseDown={onClose}>
@@ -111,7 +117,7 @@ export function CreateManagedUserDialog({
             <label>
               Role
               <select value={role} disabled={fixedRole} onChange={(event) => setRole(event.target.value as UserRole)}>
-                {roleOptions.map((option) => (
+                {availableRoles.map((option) => (
                   <option value={option.value} key={option.value}>{option.label}</option>
                 ))}
               </select>
@@ -130,7 +136,7 @@ export function CreateManagedUserDialog({
             <label>Telephone<input name="phone" /></label>
             <label>
               Club
-              <select name="clubId" defaultValue="">
+              <select name="clubId" defaultValue={defaultClubId}>
                 <option value="">Sans club</option>
                 {clubs.map((club) => <option value={club.id} key={club.id}>{club.name}</option>)}
               </select>

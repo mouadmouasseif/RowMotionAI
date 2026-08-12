@@ -43,8 +43,8 @@ function AthletesContent() {
     if (!profile) return;
     const [athletes, availableClubs, availableCoaches] = await Promise.all([
       listAthletes(profile),
-      profile.role === "SUPER_ADMIN" ? listClubs(profile) : Promise.resolve([]),
-      profile.role === "SUPER_ADMIN" ? listCoaches(profile) : Promise.resolve([]),
+      ["SUPER_ADMIN", "CLUB_ADMIN"].includes(profile.role) ? listClubs(profile) : Promise.resolve([]),
+      ["SUPER_ADMIN", "CLUB_ADMIN"].includes(profile.role) ? listCoaches(profile) : Promise.resolve([]),
     ]);
     setItems(athletes);
     setClubs(availableClubs);
@@ -93,7 +93,7 @@ function AthletesContent() {
       subtitle="Gérez les profils, les clubs et les affectations de coach."
       headerActions={
         <>
-          {profile.role === "SUPER_ADMIN" && (
+          {["SUPER_ADMIN", "CLUB_ADMIN"].includes(profile.role) && (
             <button className="button primary" type="button" onClick={() => setCreateOpen(true)}>
               <UserPlus />
               Ajouter un athlete
@@ -276,6 +276,7 @@ function AthletesContent() {
             coaches={coaches}
             defaultRole="ATHLETE"
             fixedRole
+            allowedRoles={["ATHLETE"]}
             onClose={() => setCreateOpen(false)}
             onSaved={load}
           />

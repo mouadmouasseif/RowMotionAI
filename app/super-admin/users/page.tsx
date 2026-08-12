@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { UserPlus, Users } from "lucide-react";
+import { ShieldCheck, UserCog, UserPlus, Users } from "lucide-react";
 import { CreateManagedUserDialog } from "@/components/admin/CreateManagedUserDialog";
 import { AppShell } from "@/components/AppShell";
 import { ProtectedPage } from "@/components/ProtectedPage";
@@ -10,14 +10,24 @@ import { useAuth } from "@/providers/AuthProvider";
 import { listClubs, listManagedUsers } from "@/services/club-service";
 import { listCoaches } from "@/services/user-service";
 import type { Club } from "@/types/club";
-import type { UserProfile } from "@/types/user";
+import type { UserProfile, UserRole } from "@/types/user";
+
+const creationActions: Array<{ role: UserRole; label: string; icon: typeof UserPlus }> = [
+  { role: "ATHLETE", label: "Athlete", icon: UserPlus },
+  { role: "COACH", label: "Coach", icon: UserCog },
+  { role: "JURY", label: "Jury", icon: ShieldCheck },
+  { role: "CLUB_ADMIN", label: "Admin club", icon: ShieldCheck },
+  { role: "TECHNICAL_DIRECTOR", label: "Directeur technique", icon: UserCog },
+  { role: "FEDERATION_PRESIDENT", label: "President federation", icon: ShieldCheck },
+  { role: "SUPER_ADMIN", label: "Admin super", icon: ShieldCheck },
+];
 
 function UsersContent() {
   const { profile } = useAuth();
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [clubs, setClubs] = useState<Club[]>([]);
   const [coaches, setCoaches] = useState<UserProfile[]>([]);
-  const [createOpen, setCreateOpen] = useState(false);
+  const [createRole, setCreateRole] = useState<UserRole | null>(null);
 
   useEffect(() => {
     if (profile) {
@@ -47,7 +57,16 @@ function UsersContent() {
     <AppShell
       title="Tous les utilisateurs"
       subtitle="Super administration"
-      headerActions={<button className="button primary" type="button" onClick={() => setCreateOpen(true)}><UserPlus />Creer un compte</button>}
+      headerActions={
+        <div className="quick-actions">
+          {creationActions.map(({ role, label, icon: Icon }) => (
+            <button className="button ghost" type="button" onClick={() => setCreateRole(role)} key={role}>
+              <Icon />
+              Ajouter {label}
+            </button>
+          ))}
+        </div>
+      }
     >
       <div className="data-grid">
         {users.map((user) => (
@@ -73,11 +92,15 @@ function UsersContent() {
           <p>Aucun utilisateur accessible.</p>
         </div>
       )}
-      {createOpen && (
+      {createRole && (
         <CreateManagedUserDialog
+          key={createRole}
           clubs={clubs}
           coaches={coaches}
-          onClose={() => setCreateOpen(false)}
+          defaultRole={createRole}
+          fixedRole
+          allowedRoles={[createRole]}
+          onClose={() => setCreateRole(null)}
           onSaved={load}
         />
       )}

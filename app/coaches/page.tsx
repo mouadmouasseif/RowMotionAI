@@ -50,7 +50,7 @@ function CoachesContent() {
     const [coaches, managedAthletes, availableClubs] = await Promise.all([
       listCoaches(profile),
       listAthletes(profile),
-      profile.role === "SUPER_ADMIN" ? listClubs(profile) : Promise.resolve([]),
+      ["SUPER_ADMIN", "CLUB_ADMIN"].includes(profile.role) ? listClubs(profile) : Promise.resolve([]),
     ]);
     setItems(coaches);
     setAthletes(managedAthletes);
@@ -100,7 +100,7 @@ function CoachesContent() {
       subtitle="Gérez les coachs, leur club et leurs affectations."
       headerActions={
         <>
-          {profile.role === "SUPER_ADMIN" && (
+          {["SUPER_ADMIN", "CLUB_ADMIN"].includes(profile.role) && (
             <button className="button primary" type="button" onClick={() => setCreateOpen(true)}><Plus />Ajouter un coach</button>
           )}
           <button className="button ghost"><Download />Importer</button>
@@ -230,6 +230,7 @@ function CoachesContent() {
             coaches={items}
             defaultRole="COACH"
             fixedRole
+            allowedRoles={["COACH"]}
             onClose={() => setCreateOpen(false)}
             onSaved={load}
           />
