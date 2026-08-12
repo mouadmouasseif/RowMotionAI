@@ -81,17 +81,6 @@ async function adminRequest(path: string, init: RequestInit) {
   return payload;
 }
 
-function canSaveProfileDirectly(reason: unknown) {
-  if (!(reason instanceof Error)) return false;
-  const message = reason.message.toLowerCase();
-  return (
-    (reason instanceof AdminRequestError && reason.status >= 500) ||
-    message.includes("firebase admin") ||
-    message.includes("configuration firebase") ||
-    message.includes("service administrateur indisponible")
-  );
-}
-
 async function updateFirestoreProfile(userId: string, values: ManagedUserValues) {
   const actor = auth?.currentUser;
   if (!db || !actor) throw new Error("Firebase indisponible.");
@@ -124,15 +113,7 @@ async function updateFirestoreProfile(userId: string, values: ManagedUserValues)
 }
 
 export async function updateManagedUser(userId: string, values: ManagedUserValues) {
-  try {
-    await adminRequest(`/api/admin/users/${encodeURIComponent(userId)}`, {
-      method: "PUT",
-      body: JSON.stringify(values),
-    });
-  } catch (reason) {
-    if (!canSaveProfileDirectly(reason)) throw reason;
-    await updateFirestoreProfile(userId, values);
-  }
+  await updateFirestoreProfile(userId, values);
 }
 
 export async function createManagedUser(values: ManagedCreateUserValues) {
