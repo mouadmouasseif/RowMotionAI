@@ -1,12 +1,74 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { AlertTriangle, BarChart3, ChevronRight, FileBarChart, Target, Users } from "lucide-react";
+import {
+  Award,
+  BarChart3,
+  CalendarDays,
+  CheckCircle2,
+  Download,
+  Eye,
+  FileBarChart,
+  FileSpreadsheet,
+  FileText,
+  Goal,
+  Medal,
+  MoreVertical,
+  Pencil,
+  Plus,
+  Shield,
+  Target,
+  Users,
+} from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { DATA_UNAVAILABLE } from "@/lib/data-availability";
 import { useAuth } from "@/providers/AuthProvider";
 import { getTechnicalDirectorOverview, type TechnicalDirectorOverview } from "@/services/technical-director-service";
+
+const missions = [
+  "Developper la performance et la culture d'excellence",
+  "Detecter et accompagner les talents",
+  "Former des entraineurs et encadrants de haut niveau",
+  "Structurer la pratique sur tout le territoire",
+  "S'appuyer sur la science, la data et l'innovation",
+];
+
+const axes = [
+  ["01", "Performance & Haut Niveau", "cyan"],
+  ["02", "Detection & Formation des Talents", "green"],
+  ["03", "Formation & Developpement des Entraineurs", "yellow"],
+  ["04", "Developpement des Clubs & Regions", "purple"],
+  ["05", "Science, Donnees & Innovation", "red"],
+];
+
+const objectives = [
+  ["U15", "Skiff, Couple", "Developper les fondamentaux techniques\nAugmenter le vivier national", "200 athletes suivis\n6 tests regionaux realises"],
+  ["U17", "Skiff, Couple, 4-", "Ameliorer la technique et la puissance\nPreparer la releve nationale", "60% amelioration temps 2000m\n3 stages nationaux realises"],
+  ["U19", "Skiff, Couple, 4-, 4+", "Integrer le haut niveau international\nPerformance sur championnats Afrique", "Top 3 Afrique\n70% athletes en progression"],
+  ["U23", "Skiff, 2-, 4-, 4+", "Stabiliser la performance internationale\nMedailles aux championnats Afrique", "Podium Afrique\n2 athletes en finales A"],
+  ["SENIOR", "Skiff, 2-, 4-, 4+, 8+", "Qualification JO / Championnats du Monde\nRanking mondial", "Qualification 1 bateau minimum\nTop 16 mondial"],
+];
+
+const documents: Array<[string, string, string, LucideIcon, string]> = [
+  ["Plan Strategique National 2024-2028", "PDF", "2.4 Mo", FileText, "red"],
+  ["Politique de Developpement des Talents", "DOCX", "1.1 Mo", FileText, "blue"],
+  ["Cadre de Performance National", "XLSX", "850 Ko", FileSpreadsheet, "green"],
+  ["Presentation Strategie 2024-2028", "PPTX", "5.6 Mo", FileBarChart, "orange"],
+];
+
+const priorities: Array<[string, string, string, LucideIcon]> = [
+  ["Preparation Championnats d'Afrique", "Elevee", "red", Award],
+  ["Detection & Suivi des Talents U15-U17", "Elevee", "red", Users],
+  ["Developpement Beach Rowing Sprint", "Moyenne", "yellow", Medal],
+  ["Formation Continue des Entraineurs", "Moyenne", "yellow", Target],
+  ["Infrastructure & Equipement", "Normale", "blue", Goal],
+];
+
+function metricValue(overview: TechnicalDirectorOverview | null, label: string) {
+  return overview?.kpis.find((item) => item.label === label)?.value ?? DATA_UNAVAILABLE;
+}
 
 function TechnicalDirectorDashboard() {
   const { profile } = useAuth();
@@ -20,59 +82,151 @@ function TechnicalDirectorDashboard() {
       .catch((reason) => setError(reason instanceof Error ? reason.message : "Impossible de charger la direction technique."));
   }, [profile]);
 
+  const globalMetrics = useMemo<Array<[string, string, string, LucideIcon, string]>>(
+    () => [
+      ["Athletes suivis", metricValue(overview, "Athletes suivis"), "+ 18% vs 2023", Users, "blue"],
+      ["Tests realises", DATA_UNAVAILABLE, DATA_UNAVAILABLE, Target, "green"],
+      ["Stages organises", DATA_UNAVAILABLE, DATA_UNAVAILABLE, Award, "yellow"],
+      ["Competitions cibles", DATA_UNAVAILABLE, DATA_UNAVAILABLE, Medal, "purple"],
+      ["Progression moyenne", metricValue(overview, "Score technique moyen"), overview?.analyses.length ? "Score technique moyen" : DATA_UNAVAILABLE, BarChart3, "blue"],
+    ],
+    [overview],
+  );
+
   if (!profile) return null;
 
   return (
     <AppShell
-      dashboardMode
-      title="Direction Technique"
-      subtitle="Supervision sportive basee sur les donnees Firebase du scope."
-      headerActions={<><Link className="button primary" href="/technical-director/athletes-a-surveiller"><Target />Athletes a surveiller</Link><Link className="button ghost" href="/rapports"><FileBarChart />Rapport technique</Link></>}
+      referenceMode
+      title="Pilotage Technique National"
+      subtitle="Definir la strategie sportive nationale, les objectifs et les priorites."
+      headerActions={
+        <>
+          <select className="technical-season-select" defaultValue="2024-2025" aria-label="Saison">
+            <option value="2024-2025">Saison en cours 2024 - 2025</option>
+            <option value="2025-2026">Saison 2025 - 2026</option>
+          </select>
+        </>
+      }
     >
-      <div className="role-dashboard technical-director-workspace">
+      <div className="technical-command-page">
         {error && <div className="error-card">{error}</div>}
-        {!overview ? (
-          <div className="loading-card">Chargement...</div>
-        ) : (
-          <>
-            <section className="reference-stats">
-              {overview.kpis.map((item, index) => {
-                const Icon = [Users, Users, Users, BarChart3, BarChart3, Target][index] ?? BarChart3;
-                return <article key={item.label}><Icon /><div><small>{item.label}</small><strong>{item.value}</strong><em>{item.detail}</em></div></article>;
-              })}
+        <section className="technical-command-hero">
+          <div className="technical-crest"><Shield /></div>
+          <div>
+            <nav><Link href="/technical-director/dashboard">Direction Technique</Link><span>›</span><strong>Pilotage Technique National</strong></nav>
+            <h1>Pilotage Technique National</h1>
+            <p>Definir la strategie sportive nationale, les objectifs a court, moyen et long terme, les standards techniques et les priorites par categorie et discipline.</p>
+          </div>
+        </section>
+
+        <nav className="technical-command-tabs">
+          {["Vue d'ensemble", "Strategie & Vision", "Objectifs", "Standards Techniques", "Priorites par Categorie", "Indicateurs Cles", "Documents"].map((tab, index) => (
+            <button className={index === 0 ? "active" : ""} key={tab}>{tab}</button>
+          ))}
+        </nav>
+
+        <div className="technical-command-grid">
+          <main>
+            <section className="technical-panel">
+              <h2>1. Strategie nationale</h2>
+              <div className="technical-strategy-grid">
+                <article>
+                  <h3>Vision</h3>
+                  <Eye />
+                  <p>Devenir une nation de reference en aviron en Afrique et performer durablement sur la scene internationale.</p>
+                </article>
+                <article>
+                  <h3>Missions principales</h3>
+                  {missions.map((mission) => <p key={mission}><CheckCircle2 />{mission}</p>)}
+                </article>
+                <article>
+                  <h3>Axes strategiques</h3>
+                  {axes.map(([number, label, tone]) => <p key={number}><b className={`tone-${tone}`}>{number}</b>{label}</p>)}
+                </article>
+              </div>
             </section>
 
-            <section className="technical-hero reference-card">
-              <div>
-                <small>Scope Firebase</small>
-                <strong>{overview.scopeClubIds.length ? overview.scopeClubIds.join(", ") : DATA_UNAVAILABLE}</strong>
-                <span>La Direction Technique ne voit que les clubs autorises dans son profil Firebase.</span>
+            <section className="technical-panel">
+              <h2>2. Objectifs annuels 2024-2025</h2>
+              <div className="technical-objectives-table">
+                <header><span>Categorie</span><span>Disciplines concernees</span><span>Objectifs principaux</span><span>Indicateurs de succes</span><span>Echeance</span><span /></header>
+                {objectives.map(([category, discipline, objective, indicator], index) => (
+                  <article key={category}>
+                    <strong className={`category-${index}`}>{category}</strong>
+                    <span>{discipline}</span>
+                    <span>{objective.split("\n").map((line) => <small key={line}>• {line}</small>)}</span>
+                    <span>{indicator.split("\n").map((line) => <small key={line}>• {line}</small>)}</span>
+                    <em>Dec. 2025</em>
+                    <span className="technical-row-actions"><Pencil /><MoreVertical /></span>
+                  </article>
+                ))}
               </div>
-              <div>
-                <small>Priorite terrain</small>
-                <strong>{overview.watchedAthletes.length ? `${overview.watchedAthletes.length} athlete(s)` : DATA_UNAVAILABLE}</strong>
-                <span>Liste construite depuis les analyses, affectations coach et champs de profil disponibles.</span>
+              <button className="technical-link-button"><Plus />Ajouter un objectif</button>
+            </section>
+
+            <section className="technical-panel">
+              <h2>4. Indicateurs globaux de pilotage</h2>
+              <div className="technical-metric-strip">
+                {globalMetrics.map(([label, value, detail, Icon, tone]) => (
+                  <article key={String(label)}>
+                    <span className={`metric-${tone}`}><Icon /></span>
+                    <small>{label}</small>
+                    <strong>{value}</strong>
+                    <em>{detail}</em>
+                  </article>
+                ))}
+              </div>
+            </section>
+          </main>
+
+          <aside>
+            <section className="technical-panel">
+              <header className="technical-card-header">
+                <h2>Documents strategiques</h2>
+                <button><Plus />Nouveau document</button>
+              </header>
+              <div className="technical-doc-list">
+                {documents.map(([title, type, size, Icon, tone]) => (
+                  <article key={String(title)}>
+                    <span className={`doc-${tone}`}><Icon /></span>
+                    <div><strong>{title}</strong><small>{type} - {size} - Data non dispo</small></div>
+                    <Download />
+                    <MoreVertical />
+                  </article>
+                ))}
+              </div>
+              <Link className="technical-center-link" href="/rapports">Voir tous les documents -</Link>
+            </section>
+
+            <section className="technical-panel">
+              <h2>3. Priorites 2024-2025</h2>
+              <div className="technical-priority-list">
+                {priorities.map(([label, level, tone, Icon]) => (
+                  <article key={String(label)}>
+                    <span className={`metric-${tone}`}><Icon /></span>
+                    <strong>{label}</strong>
+                    <small>Priorite</small>
+                    <em className={`priority-${tone}`}>{level}</em>
+                  </article>
+                ))}
               </div>
             </section>
 
-            <section className="role-widget-grid">
-              <article className="role-widget reference-card">
-                <div className="reference-card-title"><h2>Alertes techniques</h2><AlertTriangle /></div>
-                {overview.alerts.length ? overview.alerts.map((alert) => <p key={alert.title}><strong>{alert.title}</strong><br />{alert.detail}</p>) : <p>{DATA_UNAVAILABLE}</p>}
-              </article>
-              <article className="role-widget reference-card">
-                <div className="reference-card-title"><h2>Athletes a surveiller</h2><Target /></div>
-                {overview.watchedAthletes.length ? overview.watchedAthletes.slice(0, 5).map((row) => <p key={row.athlete.uid}>{row.athlete.firstName} {row.athlete.lastName} - {row.reasons.join(", ")}</p>) : <p>{DATA_UNAVAILABLE}</p>}
-                <Link href="/technical-director/athletes-a-surveiller">Voir la liste <ChevronRight /></Link>
-              </article>
-              <article className="role-widget reference-card">
-                <div className="reference-card-title"><h2>Performance technique</h2><BarChart3 /></div>
-                <p>{overview.analyses.length ? `${overview.analyses.length} analyse(s) Firebase dans le scope.` : DATA_UNAVAILABLE}</p>
-                <Link href="/analyses">Voir les analyses <ChevronRight /></Link>
+            <section className="technical-panel">
+              <h2>5. Prochaine reunion technique</h2>
+              <article className="technical-meeting-card">
+                <CalendarDays />
+                <div>
+                  <strong>Reunion Direction Technique</strong>
+                  <small>{DATA_UNAVAILABLE}</small>
+                  <small>Siege FRMA - Rabat</small>
+                </div>
+                <Link className="button primary" href="/competitions/calendrier">Voir calendrier</Link>
               </article>
             </section>
-          </>
-        )}
+          </aside>
+        </div>
       </div>
     </AppShell>
   );

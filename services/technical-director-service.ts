@@ -37,6 +37,15 @@ function scopeClubIds(profile: UserProfile) {
 async function listScopedUsers(profile: UserProfile) {
   const database = requireDb();
   const clubIds = scopeClubIds(profile);
+  if (profile.technicalScope?.type === "FEDERATION") {
+    const snapshot = await getDocs(collection(database, "users"));
+    return snapshot.docs.flatMap((item) => {
+      const role = normalizeUserRole(item.data().role);
+      return role === "ATHLETE" || role === "COACH"
+        ? [createUserProfile(item.id, typeof item.data().email === "string" ? item.data().email : null, item.data())]
+        : [];
+    });
+  }
   if (!clubIds.length) return [];
   const snapshots = await Promise.all(clubIds.map((clubId) => getDocs(query(collection(database, "users"), where("clubId", "==", clubId)))));
   const rows = new Map<string, UserProfile>();
@@ -51,6 +60,12 @@ async function listScopedUsers(profile: UserProfile) {
 async function listScopedAnalyses(profile: UserProfile) {
   const database = requireDb();
   const clubIds = scopeClubIds(profile);
+  if (profile.technicalScope?.type === "FEDERATION") {
+    const snapshot = await getDocs(collection(database, "analyses"));
+    return snapshot.docs
+      .map((item) => normalizeAnalysis({ id: item.id, ...item.data() } as RowingAnalysis))
+      .sort((a, b) => (toDate(b.createdAt)?.getTime() ?? 0) - (toDate(a.createdAt)?.getTime() ?? 0));
+  }
   if (!clubIds.length) return [];
   const snapshots = await Promise.all(clubIds.map((clubId) => getDocs(query(collection(database, "analyses"), where("clubId", "==", clubId)))));
   const rows = new Map<string, RowingAnalysis>();
