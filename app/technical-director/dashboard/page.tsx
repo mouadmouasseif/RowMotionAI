@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -13,11 +13,13 @@ import {
   FileBarChart,
   FileSpreadsheet,
   FileText,
+  FileUp,
   Goal,
   Medal,
   MoreVertical,
   Pencil,
   Plus,
+  RotateCcw,
   Shield,
   Target,
   Users,
@@ -52,12 +54,14 @@ const objectives = [
   ["SENIOR", "Skiff, 2-, 4-, 4+, 8+", "Qualification JO / Championnats du Monde\nRanking mondial", "Qualification 1 bateau minimum\nTop 16 mondial"],
 ];
 
-const documents: Array<[string, string, string, LucideIcon, string]> = [
-  ["Plan Strategique National 2024-2028", "PDF", "2.4 Mo", FileText, "red"],
-  ["Politique de Developpement des Talents", "DOCX", "1.1 Mo", FileText, "blue"],
-  ["Cadre de Performance National", "XLSX", "850 Ko", FileSpreadsheet, "green"],
-  ["Presentation Strategie 2024-2028", "PPTX", "5.6 Mo", FileBarChart, "orange"],
-];
+interface StrategicDocument {
+  id: string;
+  title: string;
+  type: string;
+  size: string;
+  icon: LucideIcon;
+  tone: string;
+}
 
 const priorities: Array<[string, string, string, LucideIcon]> = [
   ["Preparation Championnats d'Afrique", "Elevee", "red", Award],
@@ -74,10 +78,12 @@ function metricValue(overview: TechnicalDirectorOverview | null, label: string) 
 function TechnicalDirectorDashboard() {
   const { profile } = useAuth();
   const router = useRouter();
+  const documentInputRef = useRef<HTMLInputElement | null>(null);
   const [overview, setOverview] = useState<TechnicalDirectorOverview | null>(null);
   const [error, setError] = useState("");
   const [activeTab, setActiveTab] = useState("Vue d'ensemble");
   const [notice, setNotice] = useState("");
+  const [documents, setDocuments] = useState<StrategicDocument[]>([]);
 
   useEffect(() => {
     if (!profile) return;
@@ -94,6 +100,37 @@ function TechnicalDirectorDashboard() {
 
   const showSuccess = (message: string) => {
     setNotice(message);
+  };
+
+  const formatFileSize = (bytes: number) => {
+    if (bytes >= 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} Mo`;
+    if (bytes >= 1024) return `${Math.max(1, Math.round(bytes / 1024))} Ko`;
+    return `${bytes} o`;
+  };
+
+  const documentIconForType = (type: string): [LucideIcon, string] => {
+    if (["XLS", "XLSX", "CSV"].includes(type)) return [FileSpreadsheet, "green"];
+    if (["PPT", "PPTX"].includes(type)) return [FileBarChart, "orange"];
+    if (type === "PDF") return [FileText, "red"];
+    return [FileText, "blue"];
+  };
+
+  const uploadDocuments = (files: FileList | null) => {
+    if (!files?.length) return;
+    const nextDocuments = Array.from(files).map((file) => {
+      const type = file.name.includes(".") ? file.name.split(".").pop()?.toUpperCase() ?? "DOC" : "DOC";
+      const [icon, tone] = documentIconForType(type);
+      return {
+        id: `${file.name}-${file.lastModified}`,
+        title: file.name.replace(/\.[^/.]+$/, ""),
+        type,
+        size: formatFileSize(file.size),
+        icon,
+        tone,
+      };
+    });
+    setDocuments((current) => [...nextDocuments, ...current]);
+    showSuccess(`${nextDocuments.length} document(s) ajoute(s) avec succes.`);
   };
 
   const downloadDocument = (title: string, type: string) => {
@@ -182,52 +219,40 @@ function TechnicalDirectorDashboard() {
                 </article>
               </div>
             </section>
-
-            <section className="technical-panel">
-              <h2>2. Objectifs annuels 2024-2025</h2>
-              <div className="technical-objectives-table">
-                <header><span>Categorie</span><span>Disciplines concernees</span><span>Objectifs principaux</span><span>Indicateurs de succes</span><span>Echeance</span><span /></header>
-                {objectives.map(([category, discipline, objective, indicator], index) => (
-                  <article key={category}>
-                    <strong className={`category-${index}`}>{category}</strong>
-                    <span>{discipline}</span>
-                    <span>{objective.split("\n").map((line) => <small key={line}>- {line}</small>)}</span>
-                    <span>{indicator.split("\n").map((line) => <small key={line}>- {line}</small>)}</span>
-                    <em>Dec. 2025</em>
-                    <span className="technical-row-actions">
-                      <button aria-label={`Modifier ${category}`} onClick={() => showSuccess(`Objectif ${category} pret a modifier.`)}><Pencil /></button>
-                      <button aria-label={`Options ${category}`} onClick={() => showSuccess(`Options ${category} ouvertes avec succes.`)}><MoreVertical /></button>
-                    </span>
-                  </article>
-                ))}
-              </div>
-              <button className="technical-link-button" onClick={() => showSuccess("Nouvel objectif ajoute avec succes.")}><Plus />Ajouter un objectif</button>
-            </section>
-
-            <section className="technical-panel">
-              <h2>4. Indicateurs globaux de pilotage</h2>
-              <div className="technical-metric-strip">
-                {globalMetrics.map(([label, value, detail, Icon, tone]) => (
-                  <article key={String(label)}>
-                    <span className={`metric-${tone}`}><Icon /></span>
-                    <small>{label}</small>
-                    <strong>{value}</strong>
-                    <em>{detail}</em>
-                  </article>
-                ))}
-              </div>
-            </section>
           </main>
 
           <aside>
             <section className="technical-panel">
               <header className="technical-card-header">
                 <h2>Documents strategiques</h2>
-                <button onClick={() => showSuccess("Nouveau document prepare avec succes.")}><Plus />Nouveau document</button>
+                <div className="technical-doc-actions">
+                  <button onClick={() => documentInputRef.current?.click()}><FileUp />Nouveau document</button>
+                  <button aria-label="Reinitialiser les documents" onClick={() => {
+                    setDocuments([]);
+                    showSuccess("Documents strategiques reinitialises avec succes.");
+                  }}><RotateCcw /></button>
+                </div>
               </header>
+              <input
+                ref={documentInputRef}
+                className="technical-file-input"
+                type="file"
+                multiple
+                accept=".pdf,.doc,.docx,.xls,.xlsx,.csv,.ppt,.pptx"
+                onChange={(event) => {
+                  uploadDocuments(event.currentTarget.files);
+                  event.currentTarget.value = "";
+                }}
+              />
               <div className="technical-doc-list">
-                {documents.map(([title, type, size, Icon, tone]) => (
-                  <article key={String(title)}>
+                {documents.length === 0 ? (
+                  <div className="technical-doc-empty">
+                    <FileUp />
+                    <strong>Aucun document ajoute</strong>
+                    <small>Utilisez Nouveau document pour importer PDF, DOCX, XLSX ou PPTX.</small>
+                  </div>
+                ) : documents.map(({ id, title, type, size, icon: Icon, tone }) => (
+                  <article key={id}>
                     <span className={`doc-${tone}`}><Icon /></span>
                     <div><strong>{title}</strong><small>{type} - {size} - Data non dispo</small></div>
                     <button aria-label={`Telecharger ${title}`} onClick={() => downloadDocument(title, type)}><Download /></button>
@@ -269,6 +294,41 @@ function TechnicalDirectorDashboard() {
             </section>
           </aside>
         </div>
+
+        <section className="technical-panel technical-full-panel">
+          <h2>2. Objectifs annuels 2024-2025</h2>
+          <div className="technical-objectives-table">
+            <header><span>Categorie</span><span>Disciplines concernees</span><span>Objectifs principaux</span><span>Indicateurs de succes</span><span>Echeance</span><span /></header>
+            {objectives.map(([category, discipline, objective, indicator], index) => (
+              <article key={category}>
+                <strong className={`category-${index}`}>{category}</strong>
+                <span>{discipline}</span>
+                <span>{objective.split("\n").map((line) => <small key={line}>- {line}</small>)}</span>
+                <span>{indicator.split("\n").map((line) => <small key={line}>- {line}</small>)}</span>
+                <em>Dec. 2025</em>
+                <span className="technical-row-actions">
+                  <button aria-label={`Modifier ${category}`} onClick={() => showSuccess(`Objectif ${category} pret a modifier.`)}><Pencil /></button>
+                  <button aria-label={`Options ${category}`} onClick={() => showSuccess(`Options ${category} ouvertes avec succes.`)}><MoreVertical /></button>
+                </span>
+              </article>
+            ))}
+          </div>
+          <button className="technical-link-button" onClick={() => showSuccess("Nouvel objectif ajoute avec succes.")}><Plus />Ajouter un objectif</button>
+        </section>
+
+        <section className="technical-panel technical-full-panel">
+          <h2>4. Indicateurs globaux de pilotage</h2>
+          <div className="technical-metric-strip">
+            {globalMetrics.map(([label, value, detail, Icon, tone]) => (
+              <article key={String(label)}>
+                <span className={`metric-${tone}`}><Icon /></span>
+                <small>{label}</small>
+                <strong>{value}</strong>
+                <em>{detail}</em>
+              </article>
+            ))}
+          </div>
+        </section>
       </div>
     </AppShell>
   );
