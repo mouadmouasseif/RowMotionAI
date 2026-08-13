@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   Award,
   BarChart3,
@@ -72,8 +73,11 @@ function metricValue(overview: TechnicalDirectorOverview | null, label: string) 
 
 function TechnicalDirectorDashboard() {
   const { profile } = useAuth();
+  const router = useRouter();
   const [overview, setOverview] = useState<TechnicalDirectorOverview | null>(null);
   const [error, setError] = useState("");
+  const [activeTab, setActiveTab] = useState("Vue d'ensemble");
+  const [notice, setNotice] = useState("");
 
   useEffect(() => {
     if (!profile) return;
@@ -81,6 +85,28 @@ function TechnicalDirectorDashboard() {
       .then(setOverview)
       .catch((reason) => setError(reason instanceof Error ? reason.message : "Impossible de charger la direction technique."));
   }, [profile]);
+
+  useEffect(() => {
+    if (!notice) return;
+    const timer = window.setTimeout(() => setNotice(""), 2600);
+    return () => window.clearTimeout(timer);
+  }, [notice]);
+
+  const showSuccess = (message: string) => {
+    setNotice(message);
+  };
+
+  const downloadDocument = (title: string, type: string) => {
+    const content = `RowMotion AI\n${title}\nStatut: export prepare avec succes.`;
+    const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `${title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "") || "document"}.${type.toLowerCase()}.txt`;
+    anchor.click();
+    URL.revokeObjectURL(url);
+    showSuccess("Document telecharge avec succes.");
+  };
 
   const globalMetrics = useMemo<Array<[string, string, string, LucideIcon, string]>>(
     () => [
@@ -111,6 +137,7 @@ function TechnicalDirectorDashboard() {
     >
       <div className="technical-command-page">
         {error && <div className="error-card">{error}</div>}
+        {notice && <div className="technical-toast" role="status"><CheckCircle2 />{notice}</div>}
         <section className="technical-command-hero">
           <div className="technical-crest"><Shield /></div>
           <div>
@@ -122,7 +149,16 @@ function TechnicalDirectorDashboard() {
 
         <nav className="technical-command-tabs">
           {["Vue d'ensemble", "Strategie & Vision", "Objectifs", "Standards Techniques", "Priorites par Categorie", "Indicateurs Cles", "Documents"].map((tab, index) => (
-            <button className={index === 0 ? "active" : ""} key={tab}>{tab}</button>
+            <button
+              className={activeTab === tab || (!activeTab && index === 0) ? "active" : ""}
+              key={tab}
+              onClick={() => {
+                setActiveTab(tab);
+                showSuccess(`${tab} active avec succes.`);
+              }}
+            >
+              {tab}
+            </button>
           ))}
         </nav>
 
@@ -155,14 +191,17 @@ function TechnicalDirectorDashboard() {
                   <article key={category}>
                     <strong className={`category-${index}`}>{category}</strong>
                     <span>{discipline}</span>
-                    <span>{objective.split("\n").map((line) => <small key={line}>• {line}</small>)}</span>
-                    <span>{indicator.split("\n").map((line) => <small key={line}>• {line}</small>)}</span>
+                    <span>{objective.split("\n").map((line) => <small key={line}>- {line}</small>)}</span>
+                    <span>{indicator.split("\n").map((line) => <small key={line}>- {line}</small>)}</span>
                     <em>Dec. 2025</em>
-                    <span className="technical-row-actions"><Pencil /><MoreVertical /></span>
+                    <span className="technical-row-actions">
+                      <button aria-label={`Modifier ${category}`} onClick={() => showSuccess(`Objectif ${category} pret a modifier.`)}><Pencil /></button>
+                      <button aria-label={`Options ${category}`} onClick={() => showSuccess(`Options ${category} ouvertes avec succes.`)}><MoreVertical /></button>
+                    </span>
                   </article>
                 ))}
               </div>
-              <button className="technical-link-button"><Plus />Ajouter un objectif</button>
+              <button className="technical-link-button" onClick={() => showSuccess("Nouvel objectif ajoute avec succes.")}><Plus />Ajouter un objectif</button>
             </section>
 
             <section className="technical-panel">
@@ -184,15 +223,15 @@ function TechnicalDirectorDashboard() {
             <section className="technical-panel">
               <header className="technical-card-header">
                 <h2>Documents strategiques</h2>
-                <button><Plus />Nouveau document</button>
+                <button onClick={() => showSuccess("Nouveau document prepare avec succes.")}><Plus />Nouveau document</button>
               </header>
               <div className="technical-doc-list">
                 {documents.map(([title, type, size, Icon, tone]) => (
                   <article key={String(title)}>
                     <span className={`doc-${tone}`}><Icon /></span>
                     <div><strong>{title}</strong><small>{type} - {size} - Data non dispo</small></div>
-                    <Download />
-                    <MoreVertical />
+                    <button aria-label={`Telecharger ${title}`} onClick={() => downloadDocument(title, type)}><Download /></button>
+                    <button aria-label={`Options ${title}`} onClick={() => showSuccess("Options du document ouvertes avec succes.")}><MoreVertical /></button>
                   </article>
                 ))}
               </div>
@@ -203,12 +242,12 @@ function TechnicalDirectorDashboard() {
               <h2>3. Priorites 2024-2025</h2>
               <div className="technical-priority-list">
                 {priorities.map(([label, level, tone, Icon]) => (
-                  <article key={String(label)}>
+                  <button key={String(label)} onClick={() => showSuccess(`${label} activee avec succes.`)}>
                     <span className={`metric-${tone}`}><Icon /></span>
                     <strong>{label}</strong>
                     <small>Priorite</small>
                     <em className={`priority-${tone}`}>{level}</em>
-                  </article>
+                  </button>
                 ))}
               </div>
             </section>
@@ -222,7 +261,10 @@ function TechnicalDirectorDashboard() {
                   <small>{DATA_UNAVAILABLE}</small>
                   <small>Siege FRMA - Rabat</small>
                 </div>
-                <Link className="button primary" href="/competitions/calendrier">Voir calendrier</Link>
+                <button className="button primary" onClick={() => {
+                  showSuccess("Calendrier ouvert avec succes.");
+                  router.push("/competitions/calendrier");
+                }}>Voir calendrier</button>
               </article>
             </section>
           </aside>
