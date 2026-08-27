@@ -4,6 +4,7 @@ import { FIREBASE_ADMIN_CONFIG_ERROR, getAdminServices } from "@/lib/firebase/ad
 import { getAthleteCategory } from "@/lib/athlete-category";
 import {
   isUserRole,
+  normalizeUserRole,
   type ProfileDiscipline,
   type UserProfile,
   type UserRole,
@@ -102,7 +103,7 @@ export async function POST(request: Request) {
       const coach = await db.doc(`users/${coachId}`).get();
       if (
         !coach.exists ||
-        coach.data()?.role !== "COACH" ||
+        normalizeUserRole(coach.data()?.role) !== "COACH" ||
         !clubId ||
         coach.data()?.clubId !== clubId
       ) {

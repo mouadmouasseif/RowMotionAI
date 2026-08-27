@@ -1,7 +1,7 @@
 import { FieldValue } from "firebase-admin/firestore";
 import { requireApiUser } from "@/lib/api-auth";
 import { FIREBASE_ADMIN_CONFIG_ERROR, getAdminServices } from "@/lib/firebase/admin";
-import type { ProfileDiscipline, ProfileGender, UserProfile } from "@/types/user";
+import { normalizeUserRole, type ProfileDiscipline, type ProfileGender, type UserProfile } from "@/types/user";
 
 const disciplines: ProfileDiscipline[] = ["ERGOMETER", "SKIFF", "BEACH_ROWING"];
 const genders: ProfileGender[] = ["male", "female", "other", "not_specified"];
@@ -66,7 +66,8 @@ export async function PUT(
     const email = nullableString(body.email)?.toLowerCase();
     if (!email || !email.includes("@")) throw new Error("INVALID_EMAIL");
     const clubId = nullableString(body.clubId);
-    const coachId = current.role === "ATHLETE" ? nullableString(body.coachId) : null;
+    const currentRole = normalizeUserRole(current.role);
+    const coachId = currentRole === "ATHLETE" ? nullableString(body.coachId) : null;
     const selectedDisciplines = Array.isArray(body.disciplines)
       ? body.disciplines.filter(
           (value): value is ProfileDiscipline =>
@@ -84,7 +85,7 @@ export async function PUT(
       const coach = await db.doc(`users/${coachId}`).get();
       if (
         !coach.exists ||
-        coach.data()?.role !== "COACH" ||
+        normalizeUserRole(coach.data()?.role) !== "COACH" ||
         !clubId ||
         coach.data()?.clubId !== clubId
       ) {
@@ -140,7 +141,7 @@ export async function PUT(
       updatedBy: actor.uid,
     });
 
-    if (current.role === "COACH" && current.clubId !== clubId) {
+    if (currentRole === "COACH" && current.clubId !== clubId) {
       const assigned = await db.collection("users").where("coachId", "==", userId).get();
       for (const athlete of assigned.docs) {
         if (!clubId || athlete.data().clubId !== clubId) {

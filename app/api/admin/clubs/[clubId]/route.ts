@@ -1,6 +1,7 @@
 import { FieldValue } from "firebase-admin/firestore";
 import { requireApiUser } from "@/lib/api-auth";
 import { FIREBASE_ADMIN_CONFIG_ERROR, getAdminServices } from "@/lib/firebase/admin";
+import { normalizeUserRole } from "@/types/user";
 
 function responseError(reason: unknown) {
   const code = reason instanceof Error ? reason.message : "INTERNAL_ERROR";
@@ -47,7 +48,7 @@ export async function DELETE(
     members.docs.forEach((row) =>
       batch.update(row.ref, {
         clubId: null,
-        coachId: row.data().role === "ATHLETE" ? null : row.data().coachId ?? null,
+        coachId: normalizeUserRole(row.data().role) === "ATHLETE" ? null : row.data().coachId ?? null,
         updatedAt: FieldValue.serverTimestamp(),
       }),
     );

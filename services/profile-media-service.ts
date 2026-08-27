@@ -8,6 +8,7 @@ import {
   uploadProfileImage,
   validateImage,
 } from "@/services/image-storage-service";
+import { normalizeUserRole } from "@/types/user";
 
 export { StorageUploadError };
 export const validateProfileImage = validateImage;
@@ -25,12 +26,14 @@ async function canManageProfilePhoto(actorId: string, targetId: string) {
     getDoc(doc(database, "users", targetId)),
   ]);
   if (!actor.exists() || !target.exists() || actor.data().active !== true) return false;
-  if (actor.data().role === "superadmin") return true;
-  if (actor.data().role === "club_admin") {
+  const actorRole = normalizeUserRole(actor.data().role);
+  const targetRole = normalizeUserRole(target.data().role);
+  if (actorRole === "SUPER_ADMIN") return true;
+  if (actorRole === "CLUB_ADMIN") {
     return Boolean(actor.data().clubId && actor.data().clubId === target.data().clubId);
   }
-  return actor.data().role === "coach"
-    && target.data().role === "athlete"
+  return actorRole === "COACH"
+    && targetRole === "ATHLETE"
     && target.data().coachId === actorId;
 }
 
