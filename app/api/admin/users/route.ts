@@ -1,6 +1,6 @@
 import { FieldValue } from "firebase-admin/firestore";
 import { requireApiUser } from "@/lib/api-auth";
-import { getAdminServices } from "@/lib/firebase/admin";
+import { FIREBASE_ADMIN_CONFIG_ERROR, getAdminServices } from "@/lib/firebase/admin";
 import { getAthleteCategory } from "@/lib/athlete-category";
 import {
   isUserRole,
@@ -28,7 +28,9 @@ function responseError(reason: unknown) {
       ? 401
       : code === "FORBIDDEN"
         ? 403
-        : code === "INVALID_ROLE" || code === "INVALID_EMAIL" || code === "INVALID_PASSWORD" || code === "INVALID_COACH"
+        : code === FIREBASE_ADMIN_CONFIG_ERROR
+          ? 500
+          : code === "INVALID_ROLE" || code === "INVALID_EMAIL" || code === "INVALID_PASSWORD" || code === "INVALID_COACH"
           ? 400
           : 500;
   const messages: Record<string, string> = {
@@ -39,6 +41,7 @@ function responseError(reason: unknown) {
     INVALID_EMAIL: "L'adresse e-mail est invalide.",
     INVALID_PASSWORD: "Le mot de passe doit contenir au moins 6 caracteres.",
     INVALID_COACH: "Le coach selectionne est invalide ou appartient a un autre club.",
+    [FIREBASE_ADMIN_CONFIG_ERROR]: "Configuration Firebase Admin manquante sur le serveur.",
   };
   return Response.json(
     { success: false, error: { code, message: messages[code] ?? code } },

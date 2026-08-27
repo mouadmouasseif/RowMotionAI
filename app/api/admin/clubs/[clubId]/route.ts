@@ -1,16 +1,25 @@
 import { FieldValue } from "firebase-admin/firestore";
 import { requireApiUser } from "@/lib/api-auth";
-import { getAdminServices } from "@/lib/firebase/admin";
+import { FIREBASE_ADMIN_CONFIG_ERROR, getAdminServices } from "@/lib/firebase/admin";
 
 function responseError(reason: unknown) {
   const code = reason instanceof Error ? reason.message : "INTERNAL_ERROR";
   const status =
-    code === "AUTH_REQUIRED" ? 401 : code === "FORBIDDEN" ? 403 : code === "NOT_FOUND" ? 404 : 400;
+    code === "AUTH_REQUIRED"
+      ? 401
+      : code === "FORBIDDEN"
+        ? 403
+        : code === FIREBASE_ADMIN_CONFIG_ERROR
+          ? 500
+          : code === "NOT_FOUND"
+            ? 404
+            : 400;
   const messages: Record<string, string> = {
     AUTH_REQUIRED: "Authentification requise.",
     ACCOUNT_INACTIVE: "Compte administrateur inactif.",
     FORBIDDEN: "Action réservée au Super administrateur.",
     NOT_FOUND: "Club introuvable.",
+    [FIREBASE_ADMIN_CONFIG_ERROR]: "Configuration Firebase Admin manquante sur le serveur.",
   };
   return Response.json(
     { success: false, error: { code, message: messages[code] ?? code } },

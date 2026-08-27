@@ -1,6 +1,6 @@
 import { FieldValue } from "firebase-admin/firestore";
 import { requireApiUser } from "@/lib/api-auth";
-import { getAdminServices } from "@/lib/firebase/admin";
+import { FIREBASE_ADMIN_CONFIG_ERROR, getAdminServices } from "@/lib/firebase/admin";
 import type { ProfileDiscipline, ProfileGender, UserProfile } from "@/types/user";
 
 const disciplines: ProfileDiscipline[] = ["ERGOMETER", "SKIFF", "BEACH_ROWING"];
@@ -28,7 +28,9 @@ function responseError(reason: unknown) {
       ? 401
       : code === "FORBIDDEN"
         ? 403
-        : code === "NOT_FOUND"
+        : code === FIREBASE_ADMIN_CONFIG_ERROR
+          ? 500
+          : code === "NOT_FOUND"
           ? 404
           : 400;
   const messages: Record<string, string> = {
@@ -38,6 +40,7 @@ function responseError(reason: unknown) {
     NOT_FOUND: "Utilisateur introuvable.",
     INVALID_COACH: "Le coach sélectionné est invalide ou appartient à un autre club.",
     INVALID_EMAIL: "L’adresse e-mail est invalide.",
+    [FIREBASE_ADMIN_CONFIG_ERROR]: "Configuration Firebase Admin manquante sur le serveur.",
   };
   return Response.json(
     { success: false, error: { code, message: messages[code] ?? code } },

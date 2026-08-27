@@ -4,15 +4,15 @@ service firebase.storage {
     function signedIn() { return request.auth != null; }
     function profile() { return firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data; }
     function active() { return signedIn() && profile().active == true; }
-    function superAdmin() { return active() && profile().role == "superadmin"; }
-    function clubAdminFor(clubId) { return active() && profile().role == "club_admin" && profile().clubId == clubId; }
+    function superAdmin() { return active() && profile().role in ["SUPER_ADMIN", "superadmin", "super_admin"]; }
+    function clubAdminFor(clubId) { return active() && profile().role in ["CLUB_ADMIN", "club_admin", "clubadmin"] && profile().clubId == clubId; }
     function targetProfile(userId) { return firestore.get(/databases/(default)/documents/users/$(userId)).data; }
     function canManageProfile(userId) {
       return active() && (
         request.auth.uid == userId
         || superAdmin()
-        || (profile().role == "club_admin" && profile().clubId == targetProfile(userId).clubId)
-        || (profile().role == "coach" && targetProfile(userId).role == "athlete" && targetProfile(userId).coachId == request.auth.uid)
+        || (profile().role in ["CLUB_ADMIN", "club_admin", "clubadmin"] && profile().clubId == targetProfile(userId).clubId)
+        || (profile().role in ["COACH", "coach"] && targetProfile(userId).role in ["ATHLETE", "athlete"] && targetProfile(userId).coachId == request.auth.uid)
       );
     }
     function imageFile() {
@@ -27,7 +27,7 @@ service firebase.storage {
       return active() && (
         superAdmin()
         || competition(competitionId).createdBy == request.auth.uid
-        || (profile().role == "club_admin" && profile().clubId == competition(competitionId).clubId)
+        || (profile().role in ["CLUB_ADMIN", "club_admin", "clubadmin"] && profile().clubId == competition(competitionId).clubId)
       );
     }
 

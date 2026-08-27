@@ -74,7 +74,7 @@ async function adminRequest(path: string, init: RequestInit) {
     const message =
       payload?.error?.message ||
       (response.status >= 500
-        ? "Service administrateur indisponible."
+        ? "Service administrateur indisponible. Vérifiez la configuration Firebase Admin."
         : "L'action administrateur a echoue.");
     throw new AdminRequestError(message, response.status);
   }

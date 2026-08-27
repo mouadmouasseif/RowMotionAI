@@ -4,14 +4,13 @@ service cloud.firestore {
     function isSignedIn() { return request.auth != null; }
     function profile() { return get(/databases/$(database)/documents/users/$(request.auth.uid)).data; }
     function isActive() { return isSignedIn() && profile().active == true; }
-    function hasRole(role) { return isActive() && profile().role == role; }
-    function isSuperAdmin() { return hasRole("SUPER_ADMIN"); }
-    function isFederationPresident() { return hasRole("FEDERATION_PRESIDENT"); }
-    function isTechnicalDirector() { return hasRole("TECHNICAL_DIRECTOR"); }
-    function isClubAdmin() { return hasRole("CLUB_ADMIN"); }
-    function isCoach() { return hasRole("COACH"); }
-    function isAthlete() { return hasRole("ATHLETE"); }
-    function isJury() { return hasRole("JURY"); }
+    function isSuperAdmin() { return isActive() && profile().role in ["SUPER_ADMIN", "superadmin", "super_admin"]; }
+    function isFederationPresident() { return isActive() && profile().role in ["FEDERATION_PRESIDENT", "federation_president", "president_federation"]; }
+    function isTechnicalDirector() { return isActive() && profile().role in ["TECHNICAL_DIRECTOR", "technical_director", "directeur_technique"]; }
+    function isClubAdmin() { return isActive() && profile().role in ["CLUB_ADMIN", "club_admin", "clubadmin"]; }
+    function isCoach() { return isActive() && profile().role in ["COACH", "coach"]; }
+    function isAthlete() { return isActive() && profile().role in ["ATHLETE", "athlete"]; }
+    function isJury() { return isActive() && profile().role in ["JURY", "jury"]; }
     function isOwnUser(userId) { return isSignedIn() && request.auth.uid == userId; }
     function sameClub(clubId) { return isActive() && clubId != null && profile().clubId == clubId; }
     function inTechnicalScope(clubId) {
@@ -24,7 +23,7 @@ service cloud.firestore {
           || (profile().clubId == clubId)
         );
     }
-    function assignedAthlete(data) { return isCoach() && data.role == "ATHLETE" && data.coachId == request.auth.uid; }
+    function assignedAthlete(data) { return isCoach() && data.role in ["ATHLETE", "athlete"] && data.coachId == request.auth.uid; }
     function assignedCompetition(data) {
       return isJury() && (
         data.juryIds.hasAny([request.auth.uid])
@@ -84,6 +83,17 @@ service cloud.firestore {
       allow read: if isSuperAdmin() || sameClub(clubId) || inTechnicalScope(clubId);
       allow create, delete: if isSuperAdmin();
       allow update: if isSuperAdmin() || (isClubAdmin() && sameClub(clubId));
+    }
+
+    match /coachInvitations/{invitationId} {
+      allow read: if isSuperAdmin()
+        || (isClubAdmin() && sameClub(resource.data.clubId));
+      allow create: if isSuperAdmin()
+        || (isClubAdmin()
+          && request.resource.data.clubId == profile().clubId
+          && request.resource.data.requestedBy == request.auth.uid
+          && request.resource.data.status == "pending_admin_sdk");
+      allow update, delete: if isSuperAdmin();
     }
 
     match /analyses/{analysisId} {
